@@ -31,7 +31,7 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    6  # number of features to take into account (for the reward function and policy)
+    625  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
@@ -50,9 +50,9 @@ q_criterion = (
     nn.L1Loss()
 )  # criterion to determine the loss during training (otherwise hinge embedding)
 q_batch_size = 64  # batch size
-num_features = 6  # number of features to take into consideration
-q_epochs = 300  # number of epochs to iterate through for Q-learning
-min_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
+num_features = 625  # number of features to take into consideration
+q_epochs = 100  # number of epochs to iterate through for Q-learning
+min_accuracy = 1e-4  # value to terminate Q-learning (if value is better than this)
 memory_length = 128
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

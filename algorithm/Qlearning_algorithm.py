@@ -88,7 +88,10 @@ class DeepQ:
                                 250, 425, 523, 36, 108, 492, 371, 345, 350, 510, 138, 556, 622, 193, 1, 420, 150, 285,
                                 539, 320, 367, 22, 221, 228, 474, 361, 149, 179, 455, 611, 84, 187]
 
-    def select_action(self, state):
+    def select_action(self, loc):
+        state = np.zeros(625, dtype=np.float32)
+        state[loc] = 1
+        state = torch.from_numpy(state)
         sample = random.random()
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(
             -1 * self.steps_done / self.EPS_DECAY
@@ -110,14 +113,19 @@ class DeepQ:
             return np.random.randint(4)
             # return torch.tensor([[act]], device=self.device, dtype=torch.long)
 
-    def find_next_state(self, loc, action, features):
+    def find_next_state(self, loc, action):
         next_loc = self.neighbors.iloc[loc, action + 1]
-        state = features[loc]
+        state = np.zeros(625, dtype=np.float32)
+        state[loc] = 1
+
+        next_state = np.zeros(625, dtype=np.float32)
         if next_loc == 624:
             terminated = False
             finished = True
-            next_state = features[next_loc].to(self.device).unsqueeze(0)
+            next_state[next_loc] = 1
+            next_state = torch.from_numpy(next_state).to(self.device)
             reward = self.reward(next_state).detach().unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
@@ -128,13 +136,15 @@ class DeepQ:
         else:
             terminated = False
             finished = False
-            next_state = features[next_loc].to(self.device).unsqueeze(0)
+            next_state[next_loc] = 1
+            next_state = torch.from_numpy(next_state).to(self.device)
             reward = self.reward(next_state).detach().unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
 
         # formatting
-        state = state.to(self.device).unsqueeze(0)
+        state = torch.from_numpy(state).unsqueeze(0).to(self.device)
         action = torch.from_numpy(np.array([action])).to(self.device).unsqueeze(0)
-        return terminated, finished, next_state, reward, state, action
+        return terminated, finished, next_state, reward, state, action, next_loc
 
     def optimize_model(self):
         if len(self.memory) < self.batch_size:
@@ -162,9 +172,9 @@ class DeepQ:
                 self.target_net(non_final_next_states).max(1).values
             )
 
-        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch
-        loss = self.criterion(state_action_values, expected_state_action_values)
+        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
 
+        loss = self.criterion(state_action_values, expected_state_action_values)
         self.optimizer.zero_grad()
         loss.backward()
 
@@ -191,18 +201,19 @@ class DeepQ:
         self.steps_done = 0
 
         for episode in range(self.num_epochs):
+            # choose a random place to start
+            loc = np.random.randint(624)  # don't start at the finish
+
             for t in count():
-                feature = features[episode % len(features)]
-                # choose a random place to start
-                loc = np.random.randint(624)  # don't start at the finish
+                # feature = features[episode % len(features)]
 
-                action = self.select_action(feature[loc])
-                terminated, finished, next_state, reward, state, action = (
-                    self.find_next_state(loc=loc, action=action, features=feature)
+                action = self.select_action(loc)
+                terminated, finished, next_state, reward, state, action, loc = (
+                    self.find_next_state(loc=loc, action=action)
                 )
-
-                if not terminated:
-                    self.memory.push(state, action, next_state, reward)
+                # raise Exception('Please stop here')
+                # if not terminated:
+                self.memory.push(state, action, next_state, reward)
 
                 loss = self.optimize_model()
 
@@ -239,11 +250,15 @@ class DeepQ:
         # tile the starting coordinates
         n_threats = len(feature_function)
 
+        # todo: the following is not correct - this will only work for a single threat field
+        feature_vector = np.zeros((50, 625), dtype=np.float32)
+        feature_vector[[np.arange(0, 50, 1)], [self.starting_coords]] = 1
+        feature_vector = torch.from_numpy(feature_vector).to(self.device)
+
         coords = np.tile(self.starting_coords, len(feature_function))
         my_features = (
             feature_function[:, self.starting_coords].view(-1, 6).to(self.device)
-        )  # todo: can double check this, but should be correct
-        new_features = copy.deepcopy(my_features).to(self.device)
+        )
 
         mask = np.ones(coords.shape, dtype=bool)
 
@@ -255,7 +270,7 @@ class DeepQ:
         for step in range(self.path_length - 1):
             with torch.no_grad():
                 action = (
-                    self.target_net(new_features).max(1).indices.cpu().numpy()
+                    self.target_net(feature_vector).max(1).indices.cpu().numpy()
                 )  # this should be max(1) for multi-threat
 
                 coords[mask] = list(
@@ -277,6 +292,9 @@ class DeepQ:
                     # fail_ind = np.append(fail_ind, failures)
                     # fail_ind = np.unique(fail_ind)
                     mask[failures] = False
+
+                feature_vector = np.zeros((50, 625), dtype=np.float32)
+                feature_vector[[np.arange(0, 50, 1)[mask]], [coords[mask]]] = 1
 
                 new_features = (
                     feature_function[coords[mask] + coords_conv[mask]].view(-1, 6).to(self.device)
