@@ -37,7 +37,7 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 1  # number of samples to take per batch
-learning_rate = 1e-3  # learning rate
+learning_rate = 1e-6  # learning rate
 epochs = 400  # number of epochs for the main training loop
 criterion = nn.MSELoss()  # criterion to determine the loss during training
 
@@ -51,7 +51,7 @@ q_criterion = (
 )  # criterion to determine the loss during training (otherwise hinge embedding)
 q_batch_size = 64  # batch size
 num_features = 6  # number of features to take into consideration
-q_epochs = 100  # number of epochs to iterate through for Q-learning
+q_epochs = 300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
 memory_length = 128
 
@@ -61,7 +61,7 @@ neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
+data = pd.read_pickle('expert_demonstrations/single_threat_more_data.pkl')
 
 feature_averages = data.expert_feat
 feature_function = data.feature_map

@@ -99,7 +99,7 @@ def find_feature_expectation(coords, feature_function, discount):
 
 # parameters of the threat field
 dims = (25, 25)  # dimension of the threat field
-starting_coords = np.random.randint(0, 623, size=25)  # random points for path planning
+starting_coords = np.random.randint(0, 623, size=50)  # random points for path planning
 end_index = 624  # index of the final location
 path_length = 10
 gamma = 0.95
@@ -120,6 +120,8 @@ features = []  # average feature expectation
 feature_map = []  # feature map for each point in the threat field
 threat_map = []  # need this to map paths for visualization
 
+# todo: this will no longer work for multiple files
+
 for file in [file_list[0]]:
     threat = pd.read_csv(file)  # all the data for the threat field
 
@@ -134,7 +136,7 @@ for file in [file_list[0]]:
     # create the feature map for this threat field
     my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors)
     feature_map.append(my_feature_map)
-    my_features = np.zeros(2)
+    my_features = []
 
     for loc in starting_coords:
         path, status = find_optimal_path(
@@ -148,31 +150,36 @@ for file in [file_list[0]]:
         path = path[:path_length]  # arbitrarily shorten the path
 
         # find the feature expectation of the path
-        my_features += find_feature_expectation(
+        my_features.append(find_feature_expectation(
             coords=path, feature_function=my_feature_map, discount=gamma
-        )
+        ))
 
         if not status:
             # print("FAILED")
             failures += 1
 
-    my_features /= len(starting_coords)
-    features.append(my_features)
+    # my_features /= len(starting_coords)
+    # features.append(my_features)
 print(failures)
 
 # save to a pkl file
 
 expert_information = {
-    "expert_feat": features,
+    "expert_feat": [np.stack(tuple(my_features), axis=0)],
     "feature_map": feature_map,
     "threat_field": threat_map,
 }
 expert_information = pd.DataFrame(expert_information)
-expert_information.to_pickle("expert_demonstrations/single_threat.pkl")
+expert_information.to_pickle("expert_demonstrations/single_threat_more_data.pkl")
 
-print(starting_coords)
+print(', '.join(map(lambda x: str(x), starting_coords)))
+
 # note: most recent call -> starting coords: [43, 150, 232, 509, 474, 483, 347, 358, 112, 147, 338, 452,  92, 204, 391,
 # 341, 308, 437, 557, 619, 235, 174, 584, 596, 485]
 
 # single threat field example -> [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
 #  304, 513, 323, 198, 291, 200, 109]
+
+# single threat with more information -> [49, 567, 588, 318, 493, 272, 548, 33, 415, 313, 373, 487, 115, 67, 607, 47,
+# 131, 462, 298, 250, 564, 308, 447, 287, 604, 603, 564, 49, 382, 532, 248, 466, 261, 283, 162, 5, 123, 544, 123, 361,
+# 192, 507, 151, 261, 264, 390, 40, 426, 291, 292]

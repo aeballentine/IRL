@@ -14,7 +14,7 @@ from itertools import count
 from IRL_architecture import feature_avg, CustomPolicyDataset
 from IRL_utilities import new_position, MyLogger
 
-log = MyLogger(logging=True, debug_msgs=True)
+log = MyLogger(logging=False, debug_msgs=True)
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
@@ -47,18 +47,18 @@ class DQN(nn.Module):
 
 class DeepQ:
     def __init__(
-        self, n_observations, n_actions, device, LR, neighbors, gamma, target_loc, min_accuracy, memory_length, tau,
+            self, n_observations, n_actions, device, LR, neighbors, gamma, target_loc, min_accuracy, memory_length, tau,
             num_epochs, batch_size, criterion, path_length
     ):
         # basic parameters
-        self.n_observations = n_observations    # number of characteristics of the state
+        self.n_observations = n_observations  # number of characteristics of the state
         self.n_actions = n_actions  # number of possible actions
-        self.LR = LR    # learning rate
+        self.LR = LR  # learning rate
         self.min_accuracy = min_accuracy  # value to terminate Q-learning
-        self.batch_size = batch_size    # number of datapoints per epoch
-        self.num_epochs = num_epochs    # number of epochs to run
+        self.batch_size = batch_size  # number of datapoints per epoch
+        self.num_epochs = num_epochs  # number of epochs to run
         self.tau = tau  # parameter to update the target network
-        self.target_loc = target_loc    # target location
+        self.target_loc = target_loc  # target location
         self.path_length = path_length
 
         # variables that will store the dataset and networks for Q-learning
@@ -66,15 +66,15 @@ class DeepQ:
         self.memory_length = memory_length  # how many past movements to store in memory
         self.policy_net = None  # policy network
         self.target_net = None  # target network
-        self.optimizer = None   # optimizer
+        self.optimizer = None  # optimizer
         self.criterion = criterion
-        self.device = device    # should always be mps
+        self.device = device  # should always be mps
         self.reward = None  # reward neural network (updated from main code)
 
         # epsilon parameters
-        self.steps_done = 0     # to track for decay
-        self.EPS_START = 0.9    # starting value
-        self.EPS_END = 0.051    # lowest possible value
+        self.steps_done = 0  # to track for decay
+        self.EPS_START = 0.9  # starting value
+        self.EPS_END = 0.051  # lowest possible value
         self.EPS_DECAY = 250  # this was originally 1000
 
         # for movement tracking
@@ -84,8 +84,9 @@ class DeepQ:
         self.gamma = gamma  # discount factor
 
         # for a single threat field
-        self.starting_coords = [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
-                                304, 513, 323, 198, 291, 200, 109]
+        self.starting_coords = [49, 567, 588, 318, 493, 272, 548, 33, 415, 313, 373, 487, 115, 67, 607, 47,
+                                131, 462, 298, 250, 564, 308, 447, 287, 604, 603, 564, 49, 382, 532, 248, 466, 261,
+                                283, 162, 5, 123, 544, 123, 361, 192, 507, 151, 261, 264, 390, 40, 426, 291, 292]
 
     def select_action(self, state):
         sample = random.random()
@@ -201,8 +202,8 @@ class DeepQ:
                     self.find_next_state(loc=loc, action=action, features=feature)
                 )
 
-                # if not terminated:
-                self.memory.push(state, action, next_state, reward)
+                if not terminated:
+                    self.memory.push(state, action, next_state, reward)
 
                 loss = self.optimize_model()
 
@@ -210,27 +211,27 @@ class DeepQ:
                 policy_net_state_dict = self.policy_net.state_dict()
                 for key in policy_net_state_dict:
                     target_net_state_dict[key] = policy_net_state_dict[
-                        key
-                    ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
+                                                     key
+                                                 ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
                 self.target_net.load_state_dict(target_net_state_dict)
 
-                if terminated or finished or (t > 500):
+                if terminated or finished or (t > 50):
                     if loss:
-                        log.info(
-                            "Epoch: \t"
-                            + str(episode)
-                            + " \t Final Loss Calculated: \t"
-                            + str(np.round(loss.item(), 6))
-                        )
+                        # log.info(
+                        #     "Epoch: \t"
+                        #     + str(episode)
+                        #     + " \t Final Loss Calculated: \t"
+                        #     + str(np.round(loss.item(), 6))
+                        # )
                         loss = loss.item()
                     else:
                         loss = 10
-                    if finished:
-                        log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
+                    # if finished:
+                    #     log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
                     break
             if loss < self.min_accuracy:
                 break
-
+        log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 6)))
         sums = self.find_feature_expectation(feature_function=features)
         return sums
 
@@ -284,11 +285,11 @@ class DeepQ:
                 )
                 my_features[mask] += self.gamma ** (step + 1) * new_features[:, [0, -1]]
 
-        n_returns = len(self.starting_coords)
-        reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
-        feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
+        # n_returns = len(self.starting_coords)
+        # reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
+        # feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
         # print(feature_sums)
-        return feature_sums
+        return my_features.view(1, 50, 2)
 
     # class DeepQ:
     #     def __init__(
