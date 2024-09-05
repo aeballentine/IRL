@@ -84,9 +84,9 @@ class DeepQ:
         self.gamma = gamma  # discount factor
 
         # for a single threat field
-        self.starting_coords = [49, 567, 588, 318, 493, 272, 548, 33, 415, 313, 373, 487, 115, 67, 607, 47,
-                                131, 462, 298, 250, 564, 308, 447, 287, 604, 603, 564, 49, 382, 532, 248, 466, 261,
-                                283, 162, 5, 123, 544, 123, 361, 192, 507, 151, 261, 264, 390, 40, 426, 291, 292]
+        self.starting_coords = [595, 570, 108, 520, 511, 531, 586, 468, 572, 60, 263, 122, 402, 616, 432, 97, 347, 206,
+                                250, 425, 523, 36, 108, 492, 371, 345, 350, 510, 138, 556, 622, 193, 1, 420, 150, 285,
+                                539, 320, 367, 22, 221, 228, 474, 361, 149, 179, 455, 611, 84, 187]
 
     def select_action(self, state):
         sample = random.random()
@@ -117,7 +117,7 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state[0, [0, -1]]).detach().unsqueeze(0)
+            reward = self.reward(next_state).detach().unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
@@ -129,7 +129,7 @@ class DeepQ:
             terminated = False
             finished = False
             next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state[0, [0, -1]]).detach().unsqueeze(0)
+            reward = self.reward(next_state).detach().unsqueeze(0)
 
         # formatting
         state = state.to(self.device).unsqueeze(0)
@@ -162,9 +162,8 @@ class DeepQ:
                 self.target_net(non_final_next_states).max(1).values
             )
 
-        expected_state_action_values = (next_state_values * self.gamma) + reward_batch
-
-        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch
+        loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -242,10 +241,9 @@ class DeepQ:
 
         coords = np.tile(self.starting_coords, len(feature_function))
         my_features = (
-            feature_function[:, self.starting_coords].view(-1, 6)
+            feature_function[:, self.starting_coords].view(-1, 6).to(self.device)
         )  # todo: can double check this, but should be correct
         new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features[:, [0, -1]].view(-1, 2).to(self.device)
 
         mask = np.ones(coords.shape, dtype=bool)
 
@@ -283,13 +281,13 @@ class DeepQ:
                 new_features = (
                     feature_function[coords[mask] + coords_conv[mask]].view(-1, 6).to(self.device)
                 )
-                my_features[mask] += self.gamma ** (step + 1) * new_features[:, [0, -1]]
+                my_features[mask] += self.gamma ** (step + 1) * new_features
 
         # n_returns = len(self.starting_coords)
         # reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
         # feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
         # print(feature_sums)
-        return my_features.view(1, 50, 2)
+        return my_features.view(1, 50, 6)
 
     # class DeepQ:
     #     def __init__(

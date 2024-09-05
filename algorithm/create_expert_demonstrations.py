@@ -86,7 +86,7 @@ def create_feature_map(my_field, my_neighbors):
 
 def find_feature_expectation(coords, feature_function, discount):
     relevant_features = feature_function[coords]
-    relevant_features = relevant_features[:, [0, -1]]
+    # relevant_features = relevant_features[:, [0, -1]]
     discount_factor = np.reshape(
         np.array(list(map(lambda x: pow(discount, x), range(len(coords))))),
         (len(coords), 1),
@@ -101,7 +101,7 @@ def find_feature_expectation(coords, feature_function, discount):
 dims = (25, 25)  # dimension of the threat field
 starting_coords = np.random.randint(0, 623, size=50)  # random points for path planning
 end_index = 624  # index of the final location
-path_length = 10
+path_length = 2
 gamma = 0.95
 
 # neighbors dataframe: this records all the neighbors of four
@@ -183,3 +183,6 @@ print(', '.join(map(lambda x: str(x), starting_coords)))
 # single threat with more information -> [49, 567, 588, 318, 493, 272, 548, 33, 415, 313, 373, 487, 115, 67, 607, 47,
 # 131, 462, 298, 250, 564, 308, 447, 287, 604, 603, 564, 49, 382, 532, 248, 466, 261, 283, 162, 5, 123, 544, 123, 361,
 # 192, 507, 151, 261, 264, 390, 40, 426, 291, 292]
+
+# single threat wtih 6 features -> 595, 570, 108, 520, 511, 531, 586, 468, 572, 60, 263, 122, 402, 616, 432, 97, 347, 206, 250, 425, 523, 36, 108, 492, 371, 345, 350, 510, 138, 556, 622, 193, 1, 420, 150, 285, 539, 320, 367, 22, 221, 228, 474, 361, 149, 179, 455, 611, 84, 187
+#

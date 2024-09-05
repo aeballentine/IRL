@@ -26,12 +26,12 @@ log.info("Initializing code")
 # threat field
 target_loc = 624  # final location in the threat field
 gamma = 0.95  # discount factor
-path_length = 10  # maximum number of points to keep along expert generated paths
+path_length = 2  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    2  # number of features to take into account (for the reward function and policy)
+    6  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
