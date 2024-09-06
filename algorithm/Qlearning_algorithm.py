@@ -14,7 +14,7 @@ from itertools import count
 from IRL_architecture import feature_avg, CustomPolicyDataset
 from IRL_utilities import new_position, MyLogger
 
-log = MyLogger(logging=True, debug_msgs=True)
+log = MyLogger(logging=False, debug_msgs=True)
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
@@ -75,7 +75,7 @@ class DeepQ:
         self.steps_done = 0     # to track for decay
         self.EPS_START = 0.9    # starting value
         self.EPS_END = 0.051    # lowest possible value
-        self.EPS_DECAY = 250  # this was originally 1000
+        self.EPS_DECAY = 1000  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -84,10 +84,11 @@ class DeepQ:
         self.gamma = gamma  # discount factor
 
         # for a single threat field
-        self.starting_coords = [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
-                                304, 513, 323, 198, 291, 200, 109]
+        self.starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
+                                111, 504, 393, 588, 83, 27, 250]
 
-    def select_action(self, state):
+    def select_action(self, loc, features):
+        state = features[0, loc]
         sample = random.random()
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(
             -1 * self.steps_done / self.EPS_DECAY
@@ -106,8 +107,20 @@ class DeepQ:
                 return action
         else:
             # act = np.random.randint(4)
-            return np.random.randint(4)
+            # return np.random.randint(4)
             # return torch.tensor([[act]], device=self.device, dtype=torch.long)
+
+            # find the neighboring cell with the smallest threat
+
+            threat_old = np.inf
+            action = np.inf
+            neighbors = self.neighbors.loc[loc][1:5]
+            for i, neighbor in enumerate(neighbors.to_numpy()):
+                threat = features[0, neighbor, 0]
+                if threat < threat_old:
+                    action = i
+                    threat_old = threat
+        return action
 
     def find_next_state(self, loc, action, features):
         next_loc = self.neighbors.iloc[loc, action + 1]
@@ -116,24 +129,24 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state[0, [0, -1]]).detach().unsqueeze(0)
+            reward = self.reward(next_state).detach().unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
             finished = False
             next_state = None
-            reward = torch.tensor([0]).to(self.device)
+            reward = torch.tensor([[0]]).to(self.device)
 
         else:
             terminated = False
             finished = False
             next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state[0, [0, -1]]).detach().unsqueeze(0)
+            reward = self.reward(next_state).detach().unsqueeze(0)
 
         # formatting
         state = state.to(self.device).unsqueeze(0)
         action = torch.from_numpy(np.array([action])).to(self.device).unsqueeze(0)
-        return terminated, finished, next_state, reward, state, action
+        return terminated, finished, next_state, reward, state, action, next_loc
 
     def optimize_model(self):
         if len(self.memory) < self.batch_size:
@@ -161,9 +174,9 @@ class DeepQ:
                 self.target_net(non_final_next_states).max(1).values
             )
 
-        expected_state_action_values = (next_state_values * self.gamma) + reward_batch
+        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch
 
-        loss = self.criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+        loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -191,13 +204,14 @@ class DeepQ:
         self.steps_done = 0
 
         for episode in range(self.num_epochs):
+            loc = np.random.randint(624)  # don't start at the finish
+
             for t in count():
                 feature = features[episode % len(features)]
                 # choose a random place to start
-                loc = np.random.randint(624)  # don't start at the finish
 
-                action = self.select_action(feature[loc])
-                terminated, finished, next_state, reward, state, action = (
+                action = self.select_action(loc, features=features)
+                terminated, finished, next_state, reward, state, action, loc = (
                     self.find_next_state(loc=loc, action=action, features=feature)
                 )
 
@@ -214,19 +228,20 @@ class DeepQ:
                     ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
                 self.target_net.load_state_dict(target_net_state_dict)
 
-                if terminated or finished or (t > 500):
+                if terminated or finished or (t > 25):
                     if loss:
-                        log.info(
-                            "Epoch: \t"
-                            + str(episode)
-                            + " \t Final Loss Calculated: \t"
-                            + str(np.round(loss.item(), 6))
-                        )
+                        if episode % 20 == 0:
+                            log.info(
+                                "Epoch: \t"
+                                + str(episode)
+                                + " \t Final Loss Calculated: \t"
+                                + str(np.round(loss.item(), 6))
+                            )
                         loss = loss.item()
                     else:
                         loss = 10
-                    if finished:
-                        log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
+                    # if finished:
+                    #     log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
                     break
             if loss < self.min_accuracy:
                 break
@@ -241,14 +256,14 @@ class DeepQ:
 
         coords = np.tile(self.starting_coords, len(feature_function))
         my_features = (
-            feature_function[:, self.starting_coords].view(-1, 6)
+            feature_function[:, self.starting_coords].view(-1, self.n_observations)
         )  # todo: can double check this, but should be correct
         new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features[:, [0, -1]].view(-1, 2).to(self.device)
+        my_features = my_features.view(-1, self.n_observations).to(self.device)
 
         mask = np.ones(coords.shape, dtype=bool)
 
-        feature_function = feature_function.view(-1, 6)
+        feature_function = feature_function.view(-1, self.n_observations)
         coords_conv = np.repeat(
             625 * np.arange(0, n_threats, 1), len(self.starting_coords)
         )
@@ -280,14 +295,13 @@ class DeepQ:
                     mask[failures] = False
 
                 new_features = (
-                    feature_function[coords[mask] + coords_conv[mask]].view(-1, 6).to(self.device)
+                    feature_function[coords[mask] + coords_conv[mask]].view(-1, self.n_observations).to(self.device)
                 )
-                my_features[mask] += self.gamma ** (step + 1) * new_features[:, [0, -1]]
+                my_features[mask] += self.gamma ** (step + 1) * new_features
 
         n_returns = len(self.starting_coords)
         reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
         feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
-        # print(feature_sums)
         return feature_sums
 
     # class DeepQ:

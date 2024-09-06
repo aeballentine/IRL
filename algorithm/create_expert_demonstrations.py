@@ -66,27 +66,32 @@ def find_optimal_path(
 
 def create_feature_map(my_field, my_neighbors):
     # current threat
-    my_threat = np.reshape(my_field[:-1], (625, 1))
+    my_threat = -1 * np.reshape(my_field[:-1], (625, 1))
 
     # four neighbors
-    left_vals = np.reshape(my_field[my_neighbors.left.to_numpy()], (625, 1))
-    right_vals = np.reshape(my_field[my_neighbors.right.to_numpy()], (625, 1))
-    up_vals = np.reshape(my_field[my_neighbors.up.to_numpy()], (625, 1))
-    down_vals = np.reshape(my_field[my_neighbors.down.to_numpy()], (625, 1))
+    left_vals = -1 * np.reshape(my_field[my_neighbors.left.to_numpy()], (625, 1))
+    right_vals = -1 * np.reshape(my_field[my_neighbors.right.to_numpy()], (625, 1))
+    up_vals = -1 * np.reshape(my_field[my_neighbors.up.to_numpy()], (625, 1))
+    down_vals = -1 * np.reshape(my_field[my_neighbors.down.to_numpy()], (625, 1))
 
     # euclidean distance
-    x_vals = np.reshape(my_neighbors.x_dist.to_numpy(), (625, 1)) / 12
-    y_vals = np.reshape(my_neighbors.y_dist.to_numpy(), (625, 1)) / 12
-    distance = (x_vals ** 2 + y_vals ** 2) ** 0.5
+    x_vals = np.reshape(my_neighbors.x_dist.to_numpy(), (625, 1))
+    y_vals = np.reshape(my_neighbors.y_dist.to_numpy(), (625, 1))
+    # distance = (x_vals ** 2 + y_vals ** 2) ** 0.5
 
-    return np.concatenate(
-        (my_threat, left_vals, right_vals, up_vals, down_vals, distance), axis=1
+    max_threat = 5 * max(my_threat)[0]
+    max_distance = 5 * max(x_vals)[0]
+    outside_cell = np.array([[max_threat, max_threat, max_threat, max_threat, max_threat, max_distance, max_distance]])
+
+    feature_func = np.concatenate(
+        (my_threat, left_vals, right_vals, up_vals, down_vals, x_vals, y_vals), axis=1
     )
+    return np.concatenate((feature_func, outside_cell), axis=0)
 
 
 def find_feature_expectation(coords, feature_function, discount):
     relevant_features = feature_function[coords]
-    relevant_features = relevant_features[:, [0, -1]]
+    # relevant_features = relevant_features[:, [0, -1]]
     discount_factor = np.reshape(
         np.array(list(map(lambda x: pow(discount, x), range(len(coords))))),
         (len(coords), 1),
@@ -99,9 +104,11 @@ def find_feature_expectation(coords, feature_function, discount):
 
 # parameters of the threat field
 dims = (25, 25)  # dimension of the threat field
-starting_coords = np.random.randint(0, 623, size=25)  # random points for path planning
+# starting_coords = np.random.randint(0, 623, size=25)  # random points for path planning
+starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
+                   111, 504, 393, 588, 83, 27, 250]
 end_index = 624  # index of the final location
-path_length = 10
+path_length = 25
 gamma = 0.95
 
 # neighbors dataframe: this records all the neighbors of four
@@ -120,7 +127,7 @@ features = []  # average feature expectation
 feature_map = []  # feature map for each point in the threat field
 threat_map = []  # need this to map paths for visualization
 
-for file in [file_list[0]]:
+for file in file_list[:10]:
     threat = pd.read_csv(file)  # all the data for the threat field
 
     # save the threat field
@@ -134,7 +141,7 @@ for file in [file_list[0]]:
     # create the feature map for this threat field
     my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors)
     feature_map.append(my_feature_map)
-    my_features = np.zeros(2)
+    my_features = np.zeros(7)
 
     for loc in starting_coords:
         path, status = find_optimal_path(
@@ -168,11 +175,21 @@ expert_information = {
     "threat_field": threat_map,
 }
 expert_information = pd.DataFrame(expert_information)
-expert_information.to_pickle("expert_demonstrations/single_threat.pkl")
+print(expert_information)
+print(np.array(features).shape)
+print(np.array(feature_map).shape)
+expert_information.to_pickle("expert_demonstrations/multi_threat.pkl")
 
-print(starting_coords)
+print(', '.join(map(lambda x: str(x), starting_coords)))
 # note: most recent call -> starting coords: [43, 150, 232, 509, 474, 483, 347, 358, 112, 147, 338, 452,  92, 204, 391,
 # 341, 308, 437, 557, 619, 235, 174, 584, 596, 485]
 
 # single threat field example -> [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
 #  304, 513, 323, 198, 291, 200, 109]
+
+
+# newest run -> 250, 300, 254, 204, 135, 258, 305, 487, 117, 45, 616, 420, 577, 193, 579, 111, 32, 608,
+#  454, 344, 534, 416, 582, 116, 280
+
+# single threat -> 131, 153, 139, 155,   3, 477, 558, 589, 281, 415, 117, 125, 554, 564,  99,  23, 371,
+#                                 370, 394, 42, 397, 283, 282, 343, 167

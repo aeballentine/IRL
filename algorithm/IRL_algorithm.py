@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, DQN
-from IRL_utilities import fixed_length_path, neighbors_of_four
+from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
 import matplotlib.pyplot as plt
 
@@ -26,34 +26,34 @@ log.info("Initializing code")
 # threat field
 target_loc = 624  # final location in the threat field
 gamma = 0.95  # discount factor
-path_length = 10  # maximum number of points to keep along expert generated paths
+path_length = 25  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    2  # number of features to take into account (for the reward function and policy)
+    7  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 1  # number of samples to take per batch
-learning_rate = 1e-3  # learning rate
+learning_rate = 1e-4  # learning rate
 epochs = 400  # number of epochs for the main training loop
 criterion = nn.MSELoss()  # criterion to determine the loss during training
 
 # value function
 tau = (
-    0.005  # rate at which to update the target_net variable inside the Q-learning module
+    0.8  # rate at which to update the target_net variable inside the Q-learning module
 )
 LR = 1e-3  # learning rate for Q-learning
 q_criterion = (
     nn.L1Loss()
 )  # criterion to determine the loss during training (otherwise hinge embedding)
 q_batch_size = 64  # batch size
-num_features = 6  # number of features to take into consideration
+num_features = 7  # number of features to take into consideration
 q_epochs = 100  # number of epochs to iterate through for Q-learning
-min_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
-memory_length = 128
+min_accuracy = 1e-1  # value to terminate Q-learning (if value is better than this)
+memory_length = 500
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -61,10 +61,11 @@ neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
+data = pd.read_pickle('expert_demonstrations/multi_threat.pkl')
 
 feature_averages = data.expert_feat
 feature_function = data.feature_map
+threat_fields = data.threat_field
 
 log.info("Expert feature average calculated")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -86,7 +87,7 @@ dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 log.info("The dataloaders are created")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # select the optimizer
-optimizer = torch.optim.AdamW(rewards.parameters(), lr=learning_rate, amsgrad=True)
+optimizer = torch.optim.Adam(rewards.parameters(), lr=learning_rate, amsgrad=True)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # set up the deep Q network
