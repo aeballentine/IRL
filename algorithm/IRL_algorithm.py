@@ -31,7 +31,7 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    2  # number of features to take into account (for the reward function and policy)
+    6  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
@@ -43,17 +43,17 @@ criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
 # value function
 tau = (
-    0.5  # rate at which to update the target_net variable inside the Q-learning module
+    0.8  # rate at which to update the target_net variable inside the Q-learning module
 )
 LR = 1e-6  # learning rate for Q-learning
 q_criterion = (
     nn.SmoothL1Loss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 300  # batch size
-num_features = 2  # number of features to take into consideration
+num_features = 6  # number of features to take into consideration
 q_epochs = 2300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-memory_length = 500
+memory_length = 1000
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -132,7 +132,7 @@ for epoch in range(epochs):
         y = y.to(device).float()
 
         # Check if any of the parameters have negative values
-        negatives = np.zeros(2, dtype=np.float32)
+        negatives = np.zeros(feature_dims, dtype=np.float32)
 
         for param in rewards.parameters():
             for i, valu in enumerate(param):

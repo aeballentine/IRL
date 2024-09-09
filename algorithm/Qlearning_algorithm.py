@@ -316,7 +316,8 @@ class DeepQ:
                 )
                 # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
                 my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, [0]]
-
+        log.debug(color='red', message='Number of failures \t' + str(len(coords ) - sum(mask)))
+        log.debug(color='red', message='Number of successes \t' + str(len(coords) - sum(finished_mask)))
         n_returns = len(self.starting_coords)
         reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
         feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
