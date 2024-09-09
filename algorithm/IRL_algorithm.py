@@ -8,7 +8,6 @@ import numpy as np
 import glob
 import torch
 import torch.nn as nn
-from sympy.codegen.ast import float32
 from torch.utils.data import DataLoader
 from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, WeightClipper
 from IRL_utilities import neighbors_of_four
@@ -133,18 +132,16 @@ for epoch in range(epochs):
         y = y.to(device).float()
 
         # Check if any of the parameters have negative values
-        has_negative_values = any((param < 0).any() for param in rewards.parameters())
-        print(((param < 0) for param in rewards.parameters()))
+        negatives = np.zeros(2, dtype=np.float32)
 
-        negatives = np.zeros(2)
-
-        for i, param in enumerate(rewards.parameters()):
-            if param < 0:
-
+        for param in rewards.parameters():
+            for i, valu in enumerate(param):
+                if valu < 0:
+                    negatives[i] = -1
 
         # Conditional action based on the presence of negative values
-        if has_negative_values:
-            tot = rewards(torch.tensor([1, 1], dtype=torch.float32).to(device))
+        if np.sum(negatives) < 0:
+            tot = rewards(torch.from_numpy(negatives).to(device))
             output = 500 * tot.abs() * torch.ones_like(y)
             # Do something when negative values are present
 
