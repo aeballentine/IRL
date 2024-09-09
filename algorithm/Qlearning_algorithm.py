@@ -61,12 +61,22 @@ class DeepQ:
         self.target_loc = target_loc    # target location
         self.path_length = path_length
 
+        self.loss = 0
+
         # variables that will store the dataset and networks for Q-learning
         self.memory = None  # memory class
         self.memory_length = memory_length  # how many past movements to store in memory
-        self.policy_net = None  # policy network
-        self.target_net = None  # target network
-        self.optimizer = None   # optimizer
+
+        self.policy_net = DQN(
+            n_observations=self.n_observations, n_actions=self.n_actions
+        ).to(device)
+        self.target_net = DQN(
+            n_observations=self.n_observations, n_actions=self.n_actions
+        ).to(device)
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
+        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
+
         self.criterion = criterion
         self.device = device    # should always be mps
         self.reward = None  # reward neural network (updated from main code)
@@ -75,7 +85,7 @@ class DeepQ:
         self.steps_done = 0     # to track for decay
         self.EPS_START = 0.9    # starting value
         self.EPS_END = 0.051    # lowest possible value
-        self.EPS_DECAY = 1000  # this was originally 1000
+        self.EPS_DECAY = 250  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -112,15 +122,15 @@ class DeepQ:
 
             # find the neighboring cell with the smallest threat
 
-            threat_old = np.inf
+            threat_old = -np.inf
             action = np.inf
             neighbors = self.neighbors.loc[loc][1:5]
             for i, neighbor in enumerate(neighbors.to_numpy()):
                 threat = features[0, neighbor, 0]
-                if threat < threat_old:
+                if threat > threat_old:
                     action = i
                     threat_old = threat
-        return action
+            return action
 
     def find_next_state(self, loc, action, features):
         next_loc = self.neighbors.iloc[loc, action + 1]
@@ -128,20 +138,23 @@ class DeepQ:
         if next_loc == 624:
             terminated = False
             finished = True
-            next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state).detach().unsqueeze(0)
+            next_state = features[next_loc].to(self.device)
+            reward = self.reward(next_state).unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
             finished = False
+            next_state = features[next_loc].to(self.device)
+            reward = self.reward(next_state).unsqueeze(0)
             next_state = None
-            reward = torch.tensor([[0]]).to(self.device)
 
         else:
             terminated = False
             finished = False
-            next_state = features[next_loc].to(self.device).unsqueeze(0)
-            reward = self.reward(next_state).detach().unsqueeze(0)
+            next_state = features[next_loc].to(self.device)
+            reward = self.reward(next_state).unsqueeze(0)
+            next_state = next_state.unsqueeze(0)
 
         # formatting
         state = state.to(self.device).unsqueeze(0)
@@ -174,12 +187,12 @@ class DeepQ:
                 self.target_net(non_final_next_states).max(1).values
             )
 
-        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch
+        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
 
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
-        loss.backward()
+        loss.backward(retain_graph=True)
 
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
@@ -187,65 +200,68 @@ class DeepQ:
         return loss
 
     def run_q_learning(self, features):
+        if self.loss > 0.05:     # todo: try 0.05 instead of 0.5...might lead to better convergence
+            self.policy_net = DQN(
+                n_observations=self.n_observations, n_actions=self.n_actions
+            ).to(self.device)
+            self.target_net = DQN(
+                n_observations=self.n_observations, n_actions=self.n_actions
+            ).to(self.device)
+            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
+
+        self.target_net.load_state_dict(self.policy_net.state_dict())
+
         # reinitialize relevant parameters: need to reset the learning networks, memory, optimizer, and
         # epsilon parameters
         self.memory = ReplayMemory(capacity=self.memory_length)
 
-        self.policy_net = DQN(
-            n_observations=self.n_observations, n_actions=self.n_actions
-        ).to(self.device)
-        self.target_net = DQN(
-            n_observations=self.n_observations, n_actions=self.n_actions
-        ).to(self.device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-
-        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
-
         self.steps_done = 0
 
         for episode in range(self.num_epochs):
-            loc = np.random.randint(624)  # don't start at the finish
+            # pick a random place to start
+            loc = np.random.randint(624)
+            feature = features[episode % len(features)]
+            action = self.select_action(loc, features=features)
+            terminated, finished, next_state, reward, state, action, loc = (
+                self.find_next_state(loc=loc, action=action, features=feature)
+            )
 
-            for t in count():
-                feature = features[episode % len(features)]
-                # choose a random place to start
+            # if not terminated:
+            self.memory.push(state, action, next_state, reward)
 
-                action = self.select_action(loc, features=features)
-                terminated, finished, next_state, reward, state, action, loc = (
-                    self.find_next_state(loc=loc, action=action, features=feature)
-                )
+            loss = self.optimize_model()
 
-                # if not terminated:
-                self.memory.push(state, action, next_state, reward)
+            target_net_state_dict = self.target_net.state_dict()
+            policy_net_state_dict = self.policy_net.state_dict()
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[
+                    key
+                ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
+            self.target_net.load_state_dict(target_net_state_dict)
 
-                loss = self.optimize_model()
-
-                target_net_state_dict = self.target_net.state_dict()
-                policy_net_state_dict = self.policy_net.state_dict()
-                for key in policy_net_state_dict:
-                    target_net_state_dict[key] = policy_net_state_dict[
-                        key
-                    ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
-                self.target_net.load_state_dict(target_net_state_dict)
-
-                if terminated or finished or (t > 25):
-                    if loss:
-                        if episode % 20 == 0:
-                            log.info(
-                                "Epoch: \t"
-                                + str(episode)
-                                + " \t Final Loss Calculated: \t"
-                                + str(np.round(loss.item(), 6))
-                            )
-                        loss = loss.item()
-                    else:
-                        loss = 10
-                    # if finished:
-                    #     log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
-                    break
+            if not loss:
+                loss = 10
+            else:
+                loss = loss.item()
+            # if terminated or finished or (t > 25):
+            #     if loss:
+            #         if episode % 20 == 0:
+            #             log.debug(
+            #                 "Epoch: \t"
+            #                 + str(episode)
+            #                 + " \t Final Loss Calculated: \t"
+            #                 + str(np.round(loss.item(), 6))
+            #             )
+            #         loss = loss.item()
+            #     else:
+            #         loss = 10
+                # if finished:
+                #     log.debug(color='red', message='Successfully finished \t Path Length: \t' + str(t))
+                # break
             if loss < self.min_accuracy:
                 break
-
+        log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
+        self.loss = loss
         sums = self.find_feature_expectation(feature_function=features)
         return sums
 
@@ -253,23 +269,24 @@ class DeepQ:
         # want 2 steps: 3 total points per path
         # tile the starting coordinates
         n_threats = len(feature_function)
-
-        coords = np.tile(self.starting_coords, len(feature_function))
-        my_features = (
-            feature_function[:, self.starting_coords].view(-1, self.n_observations)
-        )  # todo: can double check this, but should be correct
-        new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features.view(-1, self.n_observations).to(self.device)
-
-        mask = np.ones(coords.shape, dtype=bool)
-
         feature_function = feature_function.view(-1, self.n_observations)
-        coords_conv = np.repeat(
-            625 * np.arange(0, n_threats, 1), len(self.starting_coords)
+
+        coords = np.tile(self.starting_coords, n_threats)
+        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
+        # 626 because we've added a 626th row to the feature function for outside the boundary
+
+        my_features = (
+            feature_function[coords + coords_conv]
         )
+        new_features = copy.deepcopy(my_features).to(self.device)
+        my_features = my_features[:, [0]].view(-1, 1).to(self.device)
+        mask = np.ones(coords.shape, dtype=bool)
+        finished_mask = np.ones(coords.shape, dtype=bool)
 
         for step in range(self.path_length - 1):
+
             with torch.no_grad():
+                # log.debug(coords[[1, 3, 5, 9]])
                 action = (
                     self.target_net(new_features).max(1).indices.cpu().numpy()
                 )  # this should be max(1) for multi-threat
@@ -288,6 +305,7 @@ class DeepQ:
                     # finished = np.append(finished, ind)
                     # finished = np.unique(finished)
                     mask[ind] = False
+                    finished_mask[ind] = False
                 failures = np.where(coords == self.target_loc + 1)
                 if failures:
                     # fail_ind = np.append(fail_ind, failures)
@@ -295,9 +313,10 @@ class DeepQ:
                     mask[failures] = False
 
                 new_features = (
-                    feature_function[coords[mask] + coords_conv[mask]].view(-1, self.n_observations).to(self.device)
+                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
                 )
-                my_features[mask] += self.gamma ** (step + 1) * new_features
+                # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
+                my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, [0]]
 
         n_returns = len(self.starting_coords)
         reshaped_features = my_features.view(-1, n_returns, my_features.size(1))

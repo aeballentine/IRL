@@ -25,34 +25,34 @@ log.info("Initializing code")
 # DATA PARAMETERS
 # threat field
 target_loc = 624  # final location in the threat field
-gamma = 0.95  # discount factor
-path_length = 25  # maximum number of points to keep along expert generated paths
+gamma = 0.99  # discount factor
+path_length = 30  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    7  # number of features to take into account (for the reward function and policy)
+    6  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
 # reward function
-batch_size = 1  # number of samples to take per batch
-learning_rate = 1e-4  # learning rate
-epochs = 400  # number of epochs for the main training loop
-criterion = nn.MSELoss()  # criterion to determine the loss during training
+batch_size = 20  # number of samples to take per batch
+learning_rate = 1e-3  # learning rate
+epochs = 1000  # number of epochs for the main training loop
+criterion = nn.L1Loss()  # criterion to determine the loss during training
 
 # value function
 tau = (
-    0.8  # rate at which to update the target_net variable inside the Q-learning module
+    0.5  # rate at which to update the target_net variable inside the Q-learning module
 )
-LR = 1e-3  # learning rate for Q-learning
+LR = 1e-6  # learning rate for Q-learning
 q_criterion = (
-    nn.L1Loss()
-)  # criterion to determine the loss during training (otherwise hinge embedding)
-q_batch_size = 64  # batch size
-num_features = 7  # number of features to take into consideration
-q_epochs = 100  # number of epochs to iterate through for Q-learning
-min_accuracy = 1e-1  # value to terminate Q-learning (if value is better than this)
+    nn.SmoothL1Loss()
+)  # criterion to determine the loss during training (otherwise try hinge embedding)
+q_batch_size = 300  # batch size
+num_features = 6  # number of features to take into consideration
+q_epochs = 1300  # number of epochs to iterate through for Q-learning
+min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
 memory_length = 500
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,7 +82,7 @@ log.info(rewards)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # create the dataloader and the testloader
 dataset = CustomRewardDataset(feature_map=feature_function, expert_expectation=feature_averages)
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)  # todo: changed this to false
 
 log.info("The dataloaders are created")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -135,8 +135,12 @@ for epoch in range(epochs):
 
         # output = torch.from_numpy(output).float().to(device)
         log.info("Q-learning completed")
+        # print(output)
+        # print(y)
 
         loss = criterion(output, y)
+        log.debug(message=output)
+        log.debug(message=y)
         loss.requires_grad = True
         loss.backward()
         losses.append(loss.item())
@@ -160,5 +164,5 @@ plt.show()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # save the model parameters
-torch.save(rewards, "../results/reward_model_SINGLE.pth")
-torch.save(q_learning.policy_net, "../results/policy_model_SINGLE.pth")
+torch.save(rewards, "results/reward_model_updated_two.pth")
+torch.save(q_learning.policy_net, "results/policy_model_updated_two.pth")
