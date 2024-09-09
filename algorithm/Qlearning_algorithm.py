@@ -187,8 +187,7 @@ class DeepQ:
                 self.target_net(non_final_next_states).max(1).values
             )
 
-        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
-
+        expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
