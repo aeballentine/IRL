@@ -37,9 +37,9 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 20  # number of samples to take per batch
-learning_rate = 1e-3  # learning rate
+learning_rate = 0.5  # learning rate
 epochs = 1000  # number of epochs for the main training loop
-criterion = nn.L1Loss()  # criterion to determine the loss during training
+criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
 # value function
 tau = (
@@ -70,7 +70,11 @@ threat_fields = data.threat_field
 log.info("Expert feature average calculated")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # select the device to use: cpu or mps (mps is faster)
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else
+    "mps" if torch.backends.mps.is_available() else
+    "cpu"
+)
 log.info("The device is: " + str(device))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

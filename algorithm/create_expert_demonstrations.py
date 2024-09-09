@@ -79,7 +79,7 @@ def create_feature_map(my_field, my_neighbors):
     y_vals = 2 - (np.reshape(my_neighbors.y_dist.to_numpy(), (625, 1)) / 12)
     distance = (x_vals ** 2 + y_vals ** 2) ** 0.5
 
-    high_threat = min(my_threat)[0]    # minimum because threat is negative
+    high_threat = 5 * min(my_threat)[0]    # minimum because threat is negative
     max_distance = 0    # 0 because the distance increases toward the final destination
     outside_cell = np.array([[high_threat, high_threat, high_threat, high_threat, high_threat, max_distance]])
 
