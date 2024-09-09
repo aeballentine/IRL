@@ -71,17 +71,17 @@ class RewardFunction(nn.Module):
     def __init__(self, feature_dim):
         super(RewardFunction, self).__init__()
         # initialize the weights as zeros
-        # self.weights = nn.Parameter(torch.zeros(feature_dim))
-        self.layer1 = nn.Linear(feature_dim, 1)
+        self.weights = nn.Parameter(torch.zeros(feature_dim))
+        # self.layer1 = nn.Linear(feature_dim, 1)
 
     def forward(self, features):
         # return the feature tensor
         # return the anticipated reward function
         # using matmul: does the dot product if one arg is a matrix: matrix must be first
         # the second dimension of the matrix (# of columns) should be equal to the length of the vector
-        # return torch.dot(self.weights, features)
-        f1 = F.elu(features)
-        return self.layer1(f1)
+        return torch.dot(self.weights, features)
+        # f1 = F.elu(features)
+        # return self.layer1(features)
 
 
 # def feature_expectation(trajectories, reward_function, gamma=0.99):
@@ -147,3 +147,15 @@ class CustomPolicyDataset(Dataset):
         reward = self.rewards[item]
         next_features = self.next_features[item]
         return features, action, reward, next_features
+
+
+class WeightClipper(object):
+
+    def __call__(self, module):
+        # filter the variables to get the ones you want
+        if hasattr(module, 'weights'):
+            w = module.weights.data
+            # w = w.clamp(0, 1)
+            w = torch.abs(w)
+            module.weights.data = w
+

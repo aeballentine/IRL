@@ -8,8 +8,9 @@ import numpy as np
 import glob
 import torch
 import torch.nn as nn
+from sympy.codegen.ast import float32
 from torch.utils.data import DataLoader
-from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, DQN
+from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, WeightClipper
 from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
 import matplotlib.pyplot as plt
@@ -31,13 +32,13 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    6  # number of features to take into account (for the reward function and policy)
+    2  # number of features to take into account (for the reward function and policy)
 )
 
 # MACHINE LEARNING PARAMETERS
 # reward function
-batch_size = 20  # number of samples to take per batch
-learning_rate = 0.5  # learning rate
+batch_size = 400  # number of samples to take per batch
+learning_rate = 1  # learning rate
 epochs = 1000  # number of epochs for the main training loop
 criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
@@ -50,7 +51,7 @@ q_criterion = (
     nn.SmoothL1Loss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 300  # batch size
-num_features = 6  # number of features to take into consideration
+num_features = 2  # number of features to take into consideration
 q_epochs = 1300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
 memory_length = 500
@@ -81,6 +82,7 @@ log.info("The device is: " + str(device))
 # constants for the network & initialize the reward model
 # my_features = torch.zeros(feature_dims)
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
+clipper = WeightClipper()
 log.info(rewards)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,27 +132,73 @@ for epoch in range(epochs):
         # print(x)
         y = y.to(device).float()
 
-        log.info("Beginning Q-learning module")
+        # Check if any of the parameters have negative values
+        has_negative_values = any((param < 0).any() for param in rewards.parameters())
+        print(((param < 0) for param in rewards.parameters()))
 
-        # to numpy array: x.clone().detach().cpu().numpy()
-        q_learning.reward = rewards
+        negatives = np.zeros(2)
 
-        output = q_learning.run_q_learning(features=x)
+        for i, param in enumerate(rewards.parameters()):
+            if param < 0:
 
-        # output = torch.from_numpy(output).float().to(device)
-        log.info("Q-learning completed")
-        # print(output)
-        # print(y)
 
-        loss = criterion(output, y)
-        log.debug(message=output)
-        log.debug(message=y)
-        loss.requires_grad = True
-        loss.backward()
-        losses.append(loss.item())
-        losses_total.append(loss.item())
+        # Conditional action based on the presence of negative values
+        if has_negative_values:
+            tot = rewards(torch.tensor([1, 1], dtype=torch.float32).to(device))
+            output = 500 * tot.abs() * torch.ones_like(y)
+            # Do something when negative values are present
+
+            loss = criterion(output, y)
+            log.debug(message=output[:5])
+            log.debug(message=y[:5])
+            print(rewards.state_dict())
+
+            loss.backward()
+            losses.append(loss.item())
+            losses_total.append(loss.item())
+
+        else:
+            # Execute different action when all values are non-negative
+
+            log.info("Beginning Q-learning module")
+
+            # to numpy array: x.clone().detach().cpu().numpy()
+            q_learning.reward = rewards
+
+            output = q_learning.run_q_learning(features=x)
+
+            # output = torch.from_numpy(output).float().to(device)
+            log.info("Q-learning completed")
+            # print(output)
+            # print(y)
+
+            loss = criterion(output, y)
+            log.debug(message=output[:5])
+            log.debug(message=y[:5])
+            print(rewards.state_dict())
+
+            loss.requires_grad = True
+            loss.backward()
+            losses.append(loss.item())
+            losses_total.append(loss.item())
 
         optimizer.step()
+        print(rewards.state_dict())
+        # rewards.apply(clipper)
+        # with torch.no_grad():
+        #     for param in rewards.parameters():
+        #         param.copy_(param.abs())  # Take absolute value of the weights
+        # print(rewards.state_dict())
+
+        if loss.item() < 50:
+            new_rate = learning_rate / 1000
+        elif loss.item() < 10:
+            new_rate = learning_rate / 100000
+        else:
+            new_rate = learning_rate
+
+        for g in optimizer.param_groups:
+            g['lr'] = new_rate
 
         # log.debug(
         #     color="red",
@@ -162,6 +210,7 @@ for epoch in range(epochs):
         message="Epoch %d | Loss %6.4f" % (epoch, sum(losses) / len(losses)),
     )
 
+print(rewards.state_dict())
 losses = np.array(losses_total)
 plt.plot(losses)
 plt.show()

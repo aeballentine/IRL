@@ -83,10 +83,15 @@ def create_feature_map(my_field, my_neighbors):
     max_distance = 0    # 0 because the distance increases toward the final destination
     outside_cell = np.array([[high_threat, high_threat, high_threat, high_threat, high_threat, max_distance]])
 
+    # feature_func = np.concatenate(
+    #     (my_threat, left_vals, right_vals, up_vals, down_vals, distance), axis=1
+    # )
+    # return np.concatenate((feature_func, outside_cell), axis=0)
+
     feature_func = np.concatenate(
-        (my_threat, left_vals, right_vals, up_vals, down_vals, distance), axis=1
-    )
-    return np.concatenate((feature_func, outside_cell), axis=0)
+            (my_threat, distance), axis=1
+        )
+    return np.concatenate((feature_func, np.array([[high_threat, max_distance]])), axis=0)
 
 
 def find_feature_expectation(coords, feature_function, discount):
