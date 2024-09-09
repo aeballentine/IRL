@@ -85,7 +85,7 @@ class DeepQ:
         self.steps_done = 0     # to track for decay
         self.EPS_START = 0.9    # starting value
         self.EPS_END = 0.051    # lowest possible value
-        self.EPS_DECAY = 250  # this was originally 1000
+        self.EPS_DECAY = 500  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors

@@ -37,7 +37,7 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 400  # number of samples to take per batch
-learning_rate = 1  # learning rate
+learning_rate = 0.5  # learning rate
 epochs = 1000  # number of epochs for the main training loop
 criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
@@ -51,7 +51,7 @@ q_criterion = (
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 300  # batch size
 num_features = 2  # number of features to take into consideration
-q_epochs = 1300  # number of epochs to iterate through for Q-learning
+q_epochs = 2300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
 memory_length = 500
 
@@ -142,7 +142,7 @@ for epoch in range(epochs):
         # Conditional action based on the presence of negative values
         if np.sum(negatives) < 0:
             tot = rewards(torch.from_numpy(negatives).to(device))
-            output = 500 * tot.abs() * torch.ones_like(y)
+            output = 1e10 * tot.abs() * torch.ones_like(y)
             # Do something when negative values are present
 
             loss = criterion(output, y)
@@ -179,6 +179,7 @@ for epoch in range(epochs):
             losses.append(loss.item())
             losses_total.append(loss.item())
 
+        torch.nn.utils.clip_grad_norm_(rewards.parameters(), max_norm=1.0)
         optimizer.step()
         print(rewards.state_dict())
         # rewards.apply(clipper)
