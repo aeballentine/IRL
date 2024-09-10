@@ -43,7 +43,7 @@ criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
 # value function
 tau = (
-    0.5  # rate at which to update the target_net variable inside the Q-learning module
+    0.8  # rate at which to update the target_net variable inside the Q-learning module
 )
 LR = 1e-6  # learning rate for Q-learning
 q_criterion = (
@@ -53,7 +53,7 @@ q_batch_size = 300  # batch size
 num_features = 20  # number of features to take into consideration
 q_epochs = 2300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-memory_length = 500
+memory_length = 1000
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
