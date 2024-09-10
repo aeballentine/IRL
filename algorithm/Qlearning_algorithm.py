@@ -278,7 +278,7 @@ class DeepQ:
             feature_function[coords + coords_conv]
         )
         new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features[:, [0]].view(-1, 1).to(self.device)
+        my_features = my_features[:, :4].view(-1, 1).to(self.device)
         mask = np.ones(coords.shape, dtype=bool)
         finished_mask = np.ones(coords.shape, dtype=bool)
 
@@ -315,8 +315,8 @@ class DeepQ:
                     feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
                 )
                 # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
-                my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, [0]]
-        log.debug(color='red', message='Number of failures \t' + str(len(coords ) - sum(mask)))
+                my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, :4]
+        log.debug(color='red', message='Number of failures \t' + str(len(coords) - sum(mask)))
         log.debug(color='red', message='Number of successes \t' + str(len(coords) - sum(finished_mask)))
         n_returns = len(self.starting_coords)
         reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
