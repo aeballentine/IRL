@@ -31,7 +31,7 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    2  # number of features to take into account (for the reward function and policy)
+    4  # number of features to take into account (for the reward function)
 )
 
 # MACHINE LEARNING PARAMETERS
@@ -50,7 +50,7 @@ q_criterion = (
     nn.SmoothL1Loss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 300  # batch size
-num_features = 2  # number of features to take into consideration
+num_features = 20  # number of features to take into consideration
 q_epochs = 2300  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
 memory_length = 500
@@ -132,7 +132,7 @@ for epoch in range(epochs):
         y = y.to(device).float()
 
         # Check if any of the parameters have negative values
-        negatives = np.zeros(2, dtype=np.float32)
+        negatives = np.zeros(feature_dims, dtype=np.float32)
 
         for param in rewards.parameters():
             for i, valu in enumerate(param):
@@ -142,7 +142,7 @@ for epoch in range(epochs):
         # Conditional action based on the presence of negative values
         if np.sum(negatives) < 0:
             tot = rewards(torch.from_numpy(negatives).to(device))
-            output = 1e10 * tot.abs() * torch.ones_like(y)
+            output = 1e7 * tot.abs() * torch.ones_like(y)
             # Do something when negative values are present
 
             loss = criterion(output, y)

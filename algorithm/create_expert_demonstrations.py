@@ -32,7 +32,8 @@ def find_optimal_path(
     path = [start_index]
 
     while my_position != destination:
-        adjacent = neighbor_coords.iloc[my_position].to_numpy()[1:5]
+        adjacent = neighbor_coords.iloc[my_position].to_numpy(dtype=np.uint32)[1:5]
+
         mini = float("Inf")
         cost = float("Inf")
         for coords in adjacent:
@@ -64,39 +65,66 @@ def find_optimal_path(
     return path, success
 
 
-def create_feature_map(my_field, my_neighbors):
+def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
+    # neighbors
+    left_ind = my_neighbors.left.to_numpy()
+    right_ind = my_neighbors.right.to_numpy()
+    up_ind = my_neighbors.up.to_numpy()
+    down_ind = my_neighbors.down.to_numpy()
+
     # current threat
     my_threat = -1 * np.reshape(my_field[:-1], (625, 1))
-
-    # four neighbors
-    left_vals = -1 * np.reshape(my_field[my_neighbors.left.to_numpy()], (625, 1))
-    right_vals = -1 * np.reshape(my_field[my_neighbors.right.to_numpy()], (625, 1))
-    up_vals = -1 * np.reshape(my_field[my_neighbors.up.to_numpy()], (625, 1))
-    down_vals = -1 * np.reshape(my_field[my_neighbors.down.to_numpy()], (625, 1))
+    left_vals = -1 * np.reshape(my_field[left_ind], (625, 1))
+    right_vals = -1 * np.reshape(my_field[right_ind], (625, 1))
+    up_vals = -1 * np.reshape(my_field[up_ind], (625, 1))
+    down_vals = -1 * np.reshape(my_field[down_ind], (625, 1))
 
     # euclidean distance
-    x_vals = 2 - (np.reshape(my_neighbors.x_dist.to_numpy(), (625, 1)) / 12)
-    y_vals = 2 - (np.reshape(my_neighbors.y_dist.to_numpy(), (625, 1)) / 12)
-    distance = (x_vals ** 2 + y_vals ** 2) ** 0.5
+    distance = np.append(my_neighbors.dist.to_numpy(), 0)
+    left_dist = np.reshape(distance[left_ind], (625, 1))
+    right_dist = np.reshape(distance[right_ind], (625, 1))
+    up_dist = np.reshape(distance[up_ind], (625, 1))
+    down_dist = np.reshape(distance[down_ind], (625, 1))
+    distance = np.reshape(distance[:-1], (625, 1))
 
-    high_threat = 5 * min(my_threat)[0]    # minimum because threat is negative
+    # x gradient
+    my_gradx = np.reshape(grad_x[:-1], (625, 1))
+    left_gradx = np.reshape(grad_x[left_ind], (625, 1))
+    right_gradx = np.reshape(grad_x[right_ind], (625, 1))
+    up_gradx = np.reshape(grad_x[up_ind], (625, 1))
+    down_gradx = np.reshape(grad_x[down_ind], (625, 1))
+
+    # y gradient
+    my_grady = np.reshape(grad_y[:-1], (625, 1))
+    left_grady = np.reshape(grad_y[left_ind], (625, 1))
+    right_grady = np.reshape(grad_y[right_ind], (625, 1))
+    up_grady = np.reshape(grad_y[up_ind], (625, 1))
+    down_grady = np.reshape(grad_y[down_ind], (625, 1))
+
+    high_threat = -1 * max(my_field)    # we already appended this value in the main part of this file
     max_distance = 0    # 0 because the distance increases toward the final destination
-    outside_cell = np.array([[high_threat, high_threat, high_threat, high_threat, high_threat, max_distance]])
+    high_grad = 0
+    outside_cell = np.tile(np.array([[high_threat, max_distance, high_grad, high_grad]]), 5)
+
+    # want to group by cell, not by value type to make calling the reward function easier
+    feature_func = np.concatenate(
+        (my_threat, distance, my_gradx, my_grady,
+         left_vals, left_dist, left_gradx, left_grady,
+         right_vals, right_dist, right_gradx, right_grady,
+         up_vals, up_dist, up_gradx, up_grady,
+         down_vals, down_dist, down_gradx, down_grady), axis=1
+    )
+    return np.concatenate((feature_func, outside_cell), axis=0)
 
     # feature_func = np.concatenate(
-    #     (my_threat, left_vals, right_vals, up_vals, down_vals, distance), axis=1
-    # )
-    # return np.concatenate((feature_func, outside_cell), axis=0)
-
-    feature_func = np.concatenate(
-            (my_threat, distance), axis=1
-        )
-    return np.concatenate((feature_func, np.array([[high_threat, max_distance]])), axis=0)
+    #         (my_threat, distance), axis=1
+    #     )
+    # return np.concatenate((feature_func, np.array([[high_threat, max_distance]])), axis=0)
 
 
 def find_feature_expectation(coords, feature_function, discount):
     relevant_features = feature_function[coords]
-    relevant_features = relevant_features[:, [0]]
+    relevant_features = relevant_features[:, :4]
     discount_factor = np.reshape(
         np.array(list(map(lambda x: pow(discount, x), range(len(coords))))),
         (len(coords), 1),
@@ -144,11 +172,13 @@ if __name__ == "__main__":
         # formatting for our pathfinder
         threat_field = np.append(threat["Threat Intensity"].to_numpy(), max_threat)
         value_function = np.append(threat["Value"].to_numpy(), np.inf)
+        grad_x1 = np.append(threat['Threat Gradient x_1'], 0)
+        grad_x2 = np.append(threat['Threat Gradient x_2'], 0)
 
         # create the feature map for this threat field
-        my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors)
+        my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors, grad_x=grad_x1, grad_y=grad_x2)
         feature_map.append(my_feature_map)
-        my_features = np.zeros(1)
+        my_features = np.zeros(4)
 
         for loc in starting_coords:
             path, status = find_optimal_path(

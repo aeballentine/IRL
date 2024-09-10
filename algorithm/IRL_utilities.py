@@ -23,8 +23,9 @@ def neighbors_of_four(dims, target):
     coords = to_2d(my_points, dims)
     target = to_2d(target, dims)
 
-    x_distance = coords[1] - target[1]
-    y_distance = coords[0] - target[0]
+    x_distance = 2 - (coords[1] - target[1]) / 12
+    y_distance = 2 - (coords[0] - target[0]) / 12
+    dist = (x_distance**2 + y_distance ** 2) ** 0.5
     coords = np.concatenate(
         (np.reshape(coords[0], (size, 1)), np.reshape(coords[1], (size, 1))), axis=1
     )
@@ -90,8 +91,7 @@ def neighbors_of_four(dims, target):
             "right": right_neighbors,
             "up": up_neighbors,
             "down": down_neighbors,
-            "x_dist": -x_distance,
-            "y_dist": -y_distance,
+            "dist": dist,
         }
     )
     return my_neighbors

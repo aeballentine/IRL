@@ -125,7 +125,7 @@ class DeepQ:
             threat_old = -np.inf
             action = np.inf
             neighbors = self.neighbors.loc[loc][1:5]
-            for i, neighbor in enumerate(neighbors.to_numpy()):
+            for i, neighbor in enumerate(neighbors.to_numpy(dtype=np.uint32)):
                 threat = features[0, neighbor, 0]
                 if threat > threat_old:
                     action = i
@@ -139,21 +139,21 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state).unsqueeze(0)
+            reward = self.reward(next_state[:4]).unsqueeze(0)
             next_state = next_state.unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
             finished = False
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state).unsqueeze(0)
+            reward = self.reward(next_state[:4]).unsqueeze(0)
             next_state = None
 
         else:
             terminated = False
             finished = False
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state).unsqueeze(0)
+            reward = self.reward(next_state[:4]).unsqueeze(0)
             next_state = next_state.unsqueeze(0)
 
         # formatting
