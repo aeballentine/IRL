@@ -167,7 +167,7 @@ if __name__ == "__main__":
 
         # save the threat field
         threat_map.append(threat["Threat Intensity"].to_numpy())
-        max_threat = 10 * max(threat["Threat Intensity"].to_numpy())
+        max_threat = 50 * max(threat["Threat Intensity"].to_numpy())
 
         # formatting for our pathfinder
         threat_field = np.append(threat["Threat Intensity"].to_numpy(), max_threat)

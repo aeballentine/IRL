@@ -107,7 +107,7 @@ class DeepQ:
         if sample > eps_threshold:
             with torch.no_grad():
                 action = (
-                    self.policy_net(state[:, 4:].to(self.device))
+                    self.policy_net(state[4:].to(self.device))
                     .max(0)
                     .indices.clone()
                     .detach()
@@ -245,12 +245,12 @@ class DeepQ:
             # if terminated or finished or (t > 25):
             #     if loss:
             # if episode % 20 == 0:
-            log.debug(
-                "Epoch: \t"
-                + str(episode)
-                + " \t Final Loss Calculated: \t"
-                + str(np.round(loss, 6))
-            )
+            # log.debug(
+                # "Epoch: \t"
+                # + str(episode)
+                # + " \t Final Loss Calculated: \t"
+                # + str(np.round(loss, 6))
+            # )
             #         loss = loss.item()
             #     else:
             #         loss = 10
@@ -268,7 +268,7 @@ class DeepQ:
         # want 2 steps: 3 total points per path
         # tile the starting coordinates
         n_threats = len(feature_function)
-        feature_function = feature_function.view(-1, self.n_observations)
+        feature_function = feature_function.view(-1, 20)    # todo: this may need to change
 
         coords = np.tile(self.starting_coords, n_threats)
         coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
@@ -312,7 +312,7 @@ class DeepQ:
                     mask[failures] = False
 
                 new_features = (
-                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
+                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, 20).to(self.device)
                 )
                 # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
                 my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, :4]

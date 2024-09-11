@@ -44,7 +44,7 @@ epochs = 1000  # number of epochs for the main training loop
 tau = (
     0.8  # rate at which to update the target_net variable inside the Q-learning module
 )
-LR = 1e-6  # learning rate for Q-learning
+LR = 1e-4  # learning rate for Q-learning
 q_criterion = (
     nn.SmoothL1Loss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
