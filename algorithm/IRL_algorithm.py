@@ -39,7 +39,6 @@ feature_dims = (
 batch_size = 400  # number of samples to take per batch
 learning_rate = 0.5  # learning rate
 epochs = 1000  # number of epochs for the main training loop
-criterion = nn.SmoothL1Loss()  # criterion to determine the loss during training
 
 # value function
 tau = (
@@ -51,9 +50,9 @@ q_criterion = (
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 300  # batch size
 num_features = 20  # number of features to take into consideration
-q_epochs = 2300  # number of epochs to iterate through for Q-learning
+q_epochs = 2000  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-memory_length = 1000
+memory_length = 500
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -81,6 +80,7 @@ log.info("The device is: " + str(device))
 # constants for the network & initialize the reward model
 # my_features = torch.zeros(feature_dims)
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
+criterion = nn.CrossEntropyLoss(weight=torch.tensor([0.8, 0.1, 0.05, 0.05]).to(device))  # criterion to determine the loss
 clipper = WeightClipper()
 log.info(rewards)
 
@@ -132,54 +132,55 @@ for epoch in range(epochs):
         y = y.to(device).float()
 
         # Check if any of the parameters have negative values
-        negatives = np.zeros(feature_dims, dtype=np.float32)
-
-        for param in rewards.parameters():
-            for i, valu in enumerate(param):
-                if valu < 0:
-                    negatives[i] = -1
+        # negatives = np.zeros(feature_dims, dtype=np.float32)
+        #
+        # for param in rewards.parameters():
+        #     for i, valu in enumerate(param):
+        #         if (i == 0) or (i == 1):
+        #             if valu < 0:
+        #                 negatives[i] = -1
 
         # Conditional action based on the presence of negative values
-        if np.sum(negatives) < 0:
-            tot = rewards(torch.from_numpy(negatives).to(device))
-            output = 1e7 * tot.abs() * torch.ones_like(y)
-            # Do something when negative values are present
+        # if np.sum(negatives) < 0:
+        #     tot = rewards(torch.from_numpy(negatives).to(device))
+        #     output = 1e7 * tot.abs() * torch.ones_like(y)
+        #     # Do something when negative values are present
+        #
+        #     loss = criterion(output, y)
+        #     log.debug(message=output[:5])
+        #     log.debug(message=y[:5])
+        #     print(rewards.state_dict())
+        #
+        #     loss.backward()
+        #     losses.append(loss.item())
+        #     losses_total.append(loss.item())
 
-            loss = criterion(output, y)
-            log.debug(message=output[:5])
-            log.debug(message=y[:5])
-            print(rewards.state_dict())
+        # else:
+        # Execute different action when all values are non-negative
 
-            loss.backward()
-            losses.append(loss.item())
-            losses_total.append(loss.item())
+        log.info("Beginning Q-learning module")
 
-        else:
-            # Execute different action when all values are non-negative
+        # to numpy array: x.clone().detach().cpu().numpy()
+        q_learning.reward = rewards
 
-            log.info("Beginning Q-learning module")
+        output = q_learning.run_q_learning(features=x)
 
-            # to numpy array: x.clone().detach().cpu().numpy()
-            q_learning.reward = rewards
+        # output = torch.from_numpy(output).float().to(device)
+        log.info("Q-learning completed")
+        # print(output)
+        # print(y)
 
-            output = q_learning.run_q_learning(features=x)
+        loss = criterion(output, y)
+        log.debug(message=output[:5])
+        log.debug(message=y[:5])
+        print(rewards.state_dict())
 
-            # output = torch.from_numpy(output).float().to(device)
-            log.info("Q-learning completed")
-            # print(output)
-            # print(y)
+        loss.requires_grad = True
+        loss.backward()
+        losses.append(loss.item())
+        losses_total.append(loss.item())
 
-            loss = criterion(output, y)
-            log.debug(message=output[:5])
-            log.debug(message=y[:5])
-            print(rewards.state_dict())
-
-            loss.requires_grad = True
-            loss.backward()
-            losses.append(loss.item())
-            losses_total.append(loss.item())
-
-        torch.nn.utils.clip_grad_norm_(rewards.parameters(), max_norm=1.0)
+        # torch.nn.utils.clip_grad_norm_(rewards.parameters(), max_norm=1.0)
         optimizer.step()
         print(rewards.state_dict())
         # rewards.apply(clipper)

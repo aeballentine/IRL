@@ -71,15 +71,18 @@ class RewardFunction(nn.Module):
     def __init__(self, feature_dim):
         super(RewardFunction, self).__init__()
         # initialize the weights as zeros
-        self.weights = nn.Parameter(torch.zeros(feature_dim))
-        # self.layer1 = nn.Linear(feature_dim, 1)
+        self.weights = nn.Parameter(torch.ones(feature_dim))
+        # self.layer1 = nn.Linear(feature_dim, feature_dim, bias=False)
 
     def forward(self, features):
         # return the feature tensor
         # return the anticipated reward function
         # using matmul: does the dot product if one arg is a matrix: matrix must be first
         # the second dimension of the matrix (# of columns) should be equal to the length of the vector
-        return torch.dot(self.weights, features)
+        # return torch.dot(self.weights, features)
+        weights = torch.abs(self.weights)
+        f1 = torch.dot(weights, features)
+        return f1
         # f1 = F.elu(features)
         # return self.layer1(features)
 
@@ -158,4 +161,3 @@ class WeightClipper(object):
             # w = w.clamp(0, 1)
             w = torch.abs(w)
             module.weights.data = w
-

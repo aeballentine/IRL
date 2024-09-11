@@ -35,14 +35,14 @@ class ReplayMemory(object):
 class DQN(nn.Module):
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 128)
-        self.layer2 = nn.Linear(128, 128)
-        self.layer3 = nn.Linear(128, n_actions)
+        self.layer1 = nn.Linear(n_observations, n_actions)
+        # self.layer2 = nn.Linear(128, 128)
+        # self.layer3 = nn.Linear(128, n_actions)
 
     def forward(self, x):
-        x = func.relu(self.layer1(x))
-        x = func.relu(self.layer2(x))
-        return self.layer3(x)
+        # x = func.relu(self.layer1(x))
+        # x = func.relu(self.layer2(x))
+        return self.layer1(x)
 
 
 class DeepQ:
@@ -244,13 +244,13 @@ class DeepQ:
                 loss = loss.item()
             # if terminated or finished or (t > 25):
             #     if loss:
-            #         if episode % 20 == 0:
-            #             log.debug(
-            #                 "Epoch: \t"
-            #                 + str(episode)
-            #                 + " \t Final Loss Calculated: \t"
-            #                 + str(np.round(loss.item(), 6))
-            #             )
+            # if episode % 20 == 0:
+            #     log.debug(
+            #         "Epoch: \t"
+            #         + str(episode)
+            #         + " \t Final Loss Calculated: \t"
+            #         + str(np.round(loss, 6))
+            #     )
             #         loss = loss.item()
             #     else:
             #         loss = 10
@@ -278,7 +278,7 @@ class DeepQ:
             feature_function[coords + coords_conv]
         )
         new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features[:, :4].view(-1, 1).to(self.device)
+        my_features = my_features[:, :4].view(-1, 4).to(self.device)
         mask = np.ones(coords.shape, dtype=bool)
         finished_mask = np.ones(coords.shape, dtype=bool)
 
