@@ -107,7 +107,7 @@ class DeepQ:
         if sample > eps_threshold:
             with torch.no_grad():
                 action = (
-                    self.policy_net(state.to(self.device))
+                    self.policy_net(state[:, 4:].to(self.device))
                     .max(0)
                     .indices.clone()
                     .detach()
@@ -179,12 +179,12 @@ class DeepQ:
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
-        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
+        state_action_values = self.policy_net(state_batch[:, 4:]).gather(1, action_batch)
 
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             next_state_values[non_final_mask] = (
-                self.target_net(non_final_next_states).max(1).values
+                self.target_net(non_final_next_states[:, 4:]).max(1).values
             )
 
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
@@ -245,12 +245,12 @@ class DeepQ:
             # if terminated or finished or (t > 25):
             #     if loss:
             # if episode % 20 == 0:
-            #     log.debug(
-            #         "Epoch: \t"
-            #         + str(episode)
-            #         + " \t Final Loss Calculated: \t"
-            #         + str(np.round(loss, 6))
-            #     )
+            log.debug(
+                "Epoch: \t"
+                + str(episode)
+                + " \t Final Loss Calculated: \t"
+                + str(np.round(loss, 6))
+            )
             #         loss = loss.item()
             #     else:
             #         loss = 10
@@ -287,7 +287,7 @@ class DeepQ:
             with torch.no_grad():
                 # log.debug(coords[[1, 3, 5, 9]])
                 action = (
-                    self.target_net(new_features).max(1).indices.cpu().numpy()
+                    self.target_net(new_features[:, 4:]).max(1).indices.cpu().numpy()
                 )  # this should be max(1) for multi-threat
 
                 coords[mask] = list(
