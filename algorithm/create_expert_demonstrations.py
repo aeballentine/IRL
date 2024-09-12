@@ -2,7 +2,6 @@ import glob
 import numpy as np
 import pandas as pd
 from IRL_utilities import neighbors_of_four, to_2d
-import pickle
 
 
 def find_optimal_path(
@@ -123,11 +122,6 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     )
     return np.concatenate((feature_func, outside_cell), axis=0)
 
-    # feature_func = np.concatenate(
-    #         (my_threat, distance), axis=1
-    #     )
-    # return np.concatenate((feature_func, np.array([[high_threat, max_distance]])), axis=0)
-
 
 def find_feature_expectation(coords, feature_function, discount):
     relevant_features = feature_function[coords]
@@ -150,8 +144,8 @@ if __name__ == "__main__":
                        111, 504, 393, 588, 83, 27, 250]
     end_index = 624  # index of the final location
 
-    path_length = 10
-    gamma = 0.99
+    path_length = 10    # maximum number of points to keep
+    gamma = 0.99    # discount factor
 
     # neighbors dataframe: this records all the neighbors of four
     neighbors = neighbors_of_four(dims, end_index)
@@ -210,30 +204,15 @@ if __name__ == "__main__":
 
         my_features /= len(starting_coords)
         features.append(my_features)
-    print(failures)
+    print(failures)     # NOTE: not sure why these are failures: there are very small discrepancies
 
     # save to a pkl file
-
     expert_information = {
         "expert_feat": features,
         "feature_map": feature_map,
         "threat_field": threat_map,
     }
     expert_information = pd.DataFrame(expert_information)
-    print(expert_information)
-    print(np.array(features).shape)
-    print(np.array(feature_map).shape)
     expert_information.to_pickle("expert_demonstrations/multi_threat.pkl")
 
-    print(', '.join(map(lambda x: str(x), starting_coords)))
-    # note: most recent call -> starting coords: [43, 150, 232, 509, 474, 483, 347, 358, 112, 147, 338, 452,  92, 204, 391,
-    # 341, 308, 437, 557, 619, 235, 174, 584, 596, 485]
-
-    # single threat field example -> [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
-    #  304, 513, 323, 198, 291, 200, 109]
-
-    # newest run -> 250, 300, 254, 204, 135, 258, 305, 487, 117, 45, 616, 420, 577, 193, 579, 111, 32, 608,
-    #  454, 344, 534, 416, 582, 116, 280
-
-    # single threat -> 131, 153, 139, 155,   3, 477, 558, 589, 281, 415, 117, 125, 554, 564,  99,  23, 371,
-    #                                 370, 394, 42, 397, 283, 282, 343, 167
+    # print(', '.join(map(lambda x: str(x), starting_coords)))

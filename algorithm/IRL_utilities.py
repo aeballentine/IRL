@@ -23,19 +23,13 @@ def neighbors_of_four(dims, target):
     coords = to_2d(my_points, dims)
     target = to_2d(target, dims)
 
+    # euclidean distance to the target location
     x_distance = 2 - (coords[1] - target[1]) / 12
     y_distance = 2 - (coords[0] - target[0]) / 12
     dist = (x_distance**2 + y_distance ** 2) ** 0.5
     coords = np.concatenate(
         (np.reshape(coords[0], (size, 1)), np.reshape(coords[1], (size, 1))), axis=1
     )
-    # print(coords)
-    # coords = []
-    # for point in my_points:
-    #     coords.append(to_2d(point, dims))  # todo: can this be a numpy meshgrid?
-    #
-    # print(coords)
-    # note: i, j indexing -> i is the row and j is the column
     movements = [[0, -1], [0, 1], [-1, 0], [1, 0]]  # left, right, down, up
 
     # find all four neighbors
@@ -97,106 +91,6 @@ def neighbors_of_four(dims, target):
     return my_neighbors
 
 
-def neighbors(vertex, dim):
-    x_coord, y_coord = vertex
-
-    neighbor_verts = []
-    action = []
-    # left neighbor
-    if x_coord - 1 >= 0:
-        neighbor_verts.append([x_coord - 1, y_coord])
-        action.append(3)
-    # right neighbor:
-    if x_coord + 1 < dim[0]:
-        neighbor_verts.append([x_coord + 1, y_coord])
-        action.append(1)
-    # lower neighbor
-    if y_coord - 1 >= 0:
-        neighbor_verts.append([x_coord, y_coord - 1])
-        action.append(2)
-    # upper neighbor:
-    if y_coord + 1 < dim[1]:
-        neighbor_verts.append([x_coord, y_coord + 1])
-        action.append(0)
-
-    return neighbor_verts, action
-
-
-def neighbors_features(vertex, dim):
-    x_coord, y_coord = vertex
-
-    neighbor_verts = []
-    # left neighbor
-    if x_coord - 1 >= 0:
-        neighbor_verts.append([x_coord - 1, y_coord])
-    else:
-        neighbor_verts.append([np.inf, np.inf])
-    # right neighbor:
-    if x_coord + 1 < dim[0]:
-        neighbor_verts.append([x_coord + 1, y_coord])
-    else:
-        neighbor_verts.append([np.inf, np.inf])
-    # lower neighbor
-    if y_coord - 1 >= 0:
-        neighbor_verts.append([x_coord, y_coord - 1])
-    else:
-        neighbor_verts.append([np.inf, np.inf])
-    # upper neighbor:
-    if y_coord + 1 < dim[1]:
-        neighbor_verts.append([x_coord, y_coord + 1])
-    else:
-        neighbor_verts.append([np.inf, np.inf])
-
-    return neighbor_verts
-
-
-def coord_to_label(coords, dims=(25, 25)):
-    labels = np.arange(1, dims[0] * dims[1] + 0.5, 1)
-    labels = np.reshape(labels, dims)
-    my_list = []
-    for coord in coords:
-        label = labels[coord[0], coord[1]]
-        my_list.append(int(label))
-    return my_list
-
-
-def fixed_length_path(path, length):
-    if len(path) > length:
-        path = path[:length]
-    # elif len(path) < 25:
-    #     repetitions = 25 - len(path)
-    #     for _ in range(repetitions):
-    #         path.append(destination)
-    return np.array(path)
-
-
-def new_position(point, action, log):
-    x_coord, y_coord = point
-    success = True
-    if action == 0:
-        move_to = [x_coord, y_coord + 1]
-    elif action == 1:
-        move_to = [x_coord + 1, y_coord]
-    elif action == 2:
-        move_to = [x_coord, y_coord - 1]
-    elif action == 3:
-        move_to = [x_coord - 1, y_coord]
-    else:
-        raise Warning("Invalid action specified")
-
-    for i, val in enumerate(move_to):
-        if val > 24:
-            # log.debug("Invalid Coordinate Specified: " + str(val))
-            move_to[i] = 24
-            success = False
-        elif val < 0:
-            # log.debug("Invalid Coordinate Specified: " + str(val))
-            move_to[i] = 0
-            success = False
-
-    return move_to, success
-
-
 class MyLogger:
     def __init__(self, logging=False, debug_msgs=False, show_msgs=False):
         self.logging_msgs = logging
@@ -224,6 +118,7 @@ class MyLogger:
 
 
 if __name__ == "__main__":
+    # below is testing
     x = np.flip(np.reshape(np.arange(0, 25, 1), (5, 5)), axis=0)
     print(x)
     df = neighbors_of_four((5, 5), 24)

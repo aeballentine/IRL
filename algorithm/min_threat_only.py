@@ -177,7 +177,7 @@ class DeepQ:
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             next_state_values[non_final_mask] = (
-                self.target_net(non_final_next_states).max(1).values    # todo: changed this to min
+                self.target_net(non_final_next_states).max(1).values
             )   # value at the next state
 
         # want loss between q_{my state} and R + gamma * q_{next state}

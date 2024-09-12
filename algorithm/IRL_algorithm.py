@@ -5,19 +5,14 @@ Inverse reinforcement learning: learn the reward function from expert demonstrat
 
 import pandas as pd
 import numpy as np
-import glob
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, WeightClipper
+
+from IRL_architecture import RewardFunction, CustomRewardDataset
 from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
 import matplotlib.pyplot as plt
-import copy
-
-# todo: variable learning rate
-# NOTE: CHANGED THE INDICES TO NOW BE THE RIGHT NEIGHBORS OF FOUR: THREAT FIELD FILLS LEFT TO RIGHT AND UP
-# TODO: GAMMA GAMMA GAMMA for the discount feature expectation
 
 log.info("Initializing code")
 torch.set_printoptions(linewidth=400)
@@ -44,18 +39,18 @@ learning_rate = 0.0001  # learning rate
 epochs = 1000  # number of epochs for the main training loop
 
 # value function
-tau = (
+q_tau = (
     0.0001  # rate at which to update the target_net variable inside the Q-learning module
 )
-LR = 0.25  # learning rate for Q-learning
+q_lr = 0.25  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 400  # batch size
-num_features = 20  # number of features to take into consideration
+q_features = 20  # number of features to take into consideration
 q_epochs = 2000  # number of epochs to iterate through for Q-learning
-min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-memory_length = 1000
+q_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
+q_memory = 1000     # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -81,7 +76,6 @@ log.info("The device is: " + str(device))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # constants for the network & initialize the reward model
-# my_features = torch.zeros(feature_dims)
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
 criterion = nn.CrossEntropyLoss(weight=torch.tensor([2, 1.6, 0.2, 0.2,
                                                      0.5, 0.4, 0.05, 0.05,
@@ -89,7 +83,6 @@ criterion = nn.CrossEntropyLoss(weight=torch.tensor([2, 1.6, 0.2, 0.2,
                                                      0.5, 0.4, 0.05, 0.05,
                                                      0.5, 0.4, 0.05, 0.05,]).to(device)
                                 )  # criterion to determine the loss
-clipper = WeightClipper()
 log.info(rewards)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -98,25 +91,24 @@ dataset = CustomRewardDataset(feature_map=feature_function, expert_expectation=f
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)  # todo: changed this to false
 
 log.info("The dataloaders are created")
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # select the optimizer
 optimizer = torch.optim.Adam(rewards.parameters(), lr=learning_rate, amsgrad=True)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # set up the deep Q network
-# policy_net = DQN(n_observations=num_features, n_actions=4).to(device)
-# target_net = DQN(n_observations=num_features, n_actions=4).to(device)
 q_learning = DeepQ(
-    n_observations=num_features,
+    n_observations=q_features,
     n_actions=4,
     device=device,
-    LR=LR,
+    LR=q_lr,
     neighbors=neighbors,
     gamma=gamma,
     target_loc=target_loc,
-    min_accuracy=min_accuracy,
-    memory_length=memory_length,
-    tau=tau,
+    min_accuracy=q_accuracy,
+    memory_length=q_memory,
+    tau=q_tau,
     num_epochs=q_epochs,
     batch_size=q_batch_size,
     criterion=q_criterion,
@@ -135,71 +127,45 @@ for epoch in range(epochs):
         x, y = (
             input_data  # x is the threat field and y is the expert average feature expectation
         )
-        # x = x.to(device).float()
-        # print(x)
+
         y = y.to(device).float()
 
         log.info("Beginning Q-learning module")
-
-        # to numpy array: x.clone().detach().cpu().numpy()
         q_learning.reward = rewards
-
         output = q_learning.run_q_learning(features=x)
-
-        # output = torch.from_numpy(output).float().to(device)
         log.info("Q-learning completed")
-        # print(output)
-        # print(y)
 
         loss = criterion(output, y)
         log.debug(message=output[:5])
         log.debug(message=y[:5])
-        print(rewards.state_dict())
+        log.info(message=rewards.state_dict())
 
         loss.requires_grad = True
         loss.backward()
         losses.append(loss.item())
         losses_total.append(loss.item())
 
-        # for param in rewards.parameters():
-        #     print(param.requires_grad)
-        #
-        # for param in rewards.parameters():
-        #     if param.grad is None:
-        #         print("Grad is None")
-        #     else:
-        #         print(param.grad)
-
-        # torch.nn.utils.clip_grad_norm_(rewards.parameters(), max_norm=1.0)
         optimizer.step()
-        print(rewards.state_dict())
-        # rewards.apply(clipper)
-        # with torch.no_grad():
-        #     for param in rewards.parameters():
-        #         param.copy_(param.abs())  # Take absolute value of the weights
-        # print(rewards.state_dict())
+        log.info(message=rewards.state_dict())
 
+        # variable learning rate
         if loss.item() < 50:
-            new_rate = learning_rate / 1000
+            new_rate = learning_rate / 100
         elif loss.item() < 10:
-            new_rate = learning_rate / 100000
+            new_rate = learning_rate / 1000
         else:
             new_rate = learning_rate
 
+        # update the learning rate accordingly
         for g in optimizer.param_groups:
             g['lr'] = new_rate
 
-        # log.debug(
-        #     color="red",
-        #     message="\tEpoch %d | Batch %d | Loss %6.2f"
-        #     % (epoch, batch_num, loss.item()),
-        # )
     log.debug(
         color="blue",
         message="Epoch %d | Loss %6.4f" % (epoch, sum(losses) / len(losses)),
     )
 
-print(rewards.state_dict())
+log.info(message=rewards.state_dict())
 losses = np.array(losses_total)
 plt.plot(losses)
 plt.show()
