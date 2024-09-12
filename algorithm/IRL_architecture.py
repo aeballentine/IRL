@@ -80,8 +80,8 @@ class RewardFunction(nn.Module):
         # using matmul: does the dot product if one arg is a matrix: matrix must be first
         # the second dimension of the matrix (# of columns) should be equal to the length of the vector
         # return torch.dot(self.weights, features)
-        weights = torch.abs(self.weights)
-        f1 = torch.dot(weights, features)
+        # weights = torch.abs(self.weights)
+        f1 = torch.matmul(features, self.weights)
         return f1
         # f1 = F.elu(features)
         # return self.layer1(features)

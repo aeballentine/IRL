@@ -107,7 +107,7 @@ class DeepQ:
         if sample > eps_threshold:
             with torch.no_grad():
                 action = (
-                    self.policy_net(state[4:].to(self.device))
+                    self.policy_net(state.to(self.device))
                     .max(0)
                     .indices.clone()
                     .detach()
@@ -139,21 +139,21 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state[:4]).unsqueeze(0)
+            reward = self.reward(next_state).unsqueeze(0)
             next_state = next_state.unsqueeze(0)
 
         elif next_loc == 625:
             terminated = True
             finished = False
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state[:4]).unsqueeze(0)
+            reward = self.reward(next_state).unsqueeze(0)
             next_state = None
 
         else:
             terminated = False
             finished = False
             next_state = features[next_loc].to(self.device)
-            reward = self.reward(next_state[:4]).unsqueeze(0)
+            reward = self.reward(next_state).unsqueeze(0)
             next_state = next_state.unsqueeze(0)
 
         # formatting
@@ -179,12 +179,12 @@ class DeepQ:
         action_batch = torch.cat(batch.action)
         reward_batch = torch.cat(batch.reward)
 
-        state_action_values = self.policy_net(state_batch[:, 4:]).gather(1, action_batch)
+        state_action_values = self.policy_net(state_batch).gather(1, action_batch)
 
         next_state_values = torch.zeros(self.batch_size, device=self.device)
         with torch.no_grad():
             next_state_values[non_final_mask] = (
-                self.target_net(non_final_next_states[:, 4:]).max(1).values
+                self.target_net(non_final_next_states).max(1).values
             )
 
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
@@ -216,9 +216,16 @@ class DeepQ:
 
         self.steps_done = 0
 
+        loss_memory = []
+
         for episode in range(self.num_epochs):
             # pick a random place to start
             loc = np.random.randint(624)
+            if 500 < episode < 550:
+                loc = episode % 25
+            if 1000 < episode < 1050:
+                loc = 623 - episode % 25
+
             feature = features[episode % len(features)]
             action = self.select_action(loc, features=features)
             terminated, finished, next_state, reward, state, action, loc = (
@@ -244,13 +251,13 @@ class DeepQ:
                 loss = loss.item()
             # if terminated or finished or (t > 25):
             #     if loss:
-            # if episode % 20 == 0:
-            # log.debug(
-                # "Epoch: \t"
-                # + str(episode)
-                # + " \t Final Loss Calculated: \t"
-                # + str(np.round(loss, 6))
-            # )
+            if episode % 200 == 0:
+                log.debug(
+                    "Epoch: \t"
+                    + str(episode)
+                    + " \t Final Loss Calculated: \t"
+                    + str(np.round(loss, 6))
+                )
             #         loss = loss.item()
             #     else:
             #         loss = 10
@@ -259,6 +266,8 @@ class DeepQ:
                 # break
             if loss < self.min_accuracy:
                 break
+            loss_memory.append(loss)
+        # print(loss_memory)
         log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
         sums = self.find_feature_expectation(feature_function=features)
@@ -268,7 +277,7 @@ class DeepQ:
         # want 2 steps: 3 total points per path
         # tile the starting coordinates
         n_threats = len(feature_function)
-        feature_function = feature_function.view(-1, 20)    # todo: this may need to change
+        feature_function = feature_function.view(-1, self.n_observations)    # todo: this may need to change
 
         coords = np.tile(self.starting_coords, n_threats)
         coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
@@ -286,8 +295,11 @@ class DeepQ:
 
             with torch.no_grad():
                 # log.debug(coords[[1, 3, 5, 9]])
+                # torch.set_printoptions(linewidth=200)
+                # print(new_features[0:5, 4:])
+                # print(self.target_net(new_features[0:5, 4:]))
                 action = (
-                    self.target_net(new_features[:, 4:]).max(1).indices.cpu().numpy()
+                    self.policy_net(new_features).max(1).indices.cpu().numpy()
                 )  # this should be max(1) for multi-threat
 
                 coords[mask] = list(
@@ -316,8 +328,14 @@ class DeepQ:
                 )
                 # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
                 my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, :4]
-        log.debug(color='red', message='Number of failures \t' + str(len(coords) - sum(mask)))
-        log.debug(color='red', message='Number of successes \t' + str(len(coords) - sum(finished_mask)))
+        # total number of paths
+        total_paths = len(coords)
+        not_finishes_failures = sum(mask)
+        not_finishes = sum(finished_mask)
+        finishes = total_paths - not_finishes
+        failures = total_paths - not_finishes_failures - finishes
+        log.debug(color='red', message='Number of failures \t' + str(failures))
+        log.debug(color='red', message='Number of successes \t' + str(finishes))
         n_returns = len(self.starting_coords)
         reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
         feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)

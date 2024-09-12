@@ -13,12 +13,15 @@ from IRL_architecture import feature_avg, RewardFunction, CustomRewardDataset, W
 from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
 import matplotlib.pyplot as plt
+import copy
 
 # todo: variable learning rate
 # NOTE: CHANGED THE INDICES TO NOW BE THE RIGHT NEIGHBORS OF FOUR: THREAT FIELD FILLS LEFT TO RIGHT AND UP
 # TODO: GAMMA GAMMA GAMMA for the discount feature expectation
 
 log.info("Initializing code")
+torch.set_printoptions(linewidth=400)
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # PARAMETERS
 
@@ -31,7 +34,7 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    4  # number of features to take into account (for the reward function)
+    20  # number of features to take into account (for the reward function)
 )
 
 # MACHINE LEARNING PARAMETERS
@@ -42,17 +45,17 @@ epochs = 1000  # number of epochs for the main training loop
 
 # value function
 tau = (
-    0.8  # rate at which to update the target_net variable inside the Q-learning module
+    0.0001  # rate at which to update the target_net variable inside the Q-learning module
 )
-LR = 1e-4  # learning rate for Q-learning
+LR = 0.5  # learning rate for Q-learning
 q_criterion = (
     nn.SmoothL1Loss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
-q_batch_size = 300  # batch size
-num_features = 16  # number of features to take into consideration
+q_batch_size = 400  # batch size
+num_features = 20  # number of features to take into consideration
 q_epochs = 2000  # number of epochs to iterate through for Q-learning
 min_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-memory_length = 500
+memory_length = 1000
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -80,7 +83,7 @@ log.info("The device is: " + str(device))
 # constants for the network & initialize the reward model
 # my_features = torch.zeros(feature_dims)
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
-criterion = nn.CrossEntropyLoss(weight=torch.tensor([0.8, 0.1, 0.05, 0.05]).to(device))  # criterion to determine the loss
+criterion = nn.CrossEntropyLoss(weight=torch.tensor([1, 0.8, 0.1, 0.1]).to(device))  # criterion to determine the loss
 clipper = WeightClipper()
 log.info(rewards)
 
@@ -131,33 +134,6 @@ for epoch in range(epochs):
         # print(x)
         y = y.to(device).float()
 
-        # Check if any of the parameters have negative values
-        # negatives = np.zeros(feature_dims, dtype=np.float32)
-        #
-        # for param in rewards.parameters():
-        #     for i, valu in enumerate(param):
-        #         if (i == 0) or (i == 1):
-        #             if valu < 0:
-        #                 negatives[i] = -1
-
-        # Conditional action based on the presence of negative values
-        # if np.sum(negatives) < 0:
-        #     tot = rewards(torch.from_numpy(negatives).to(device))
-        #     output = 1e7 * tot.abs() * torch.ones_like(y)
-        #     # Do something when negative values are present
-        #
-        #     loss = criterion(output, y)
-        #     log.debug(message=output[:5])
-        #     log.debug(message=y[:5])
-        #     print(rewards.state_dict())
-        #
-        #     loss.backward()
-        #     losses.append(loss.item())
-        #     losses_total.append(loss.item())
-
-        # else:
-        # Execute different action when all values are non-negative
-
         log.info("Beginning Q-learning module")
 
         # to numpy array: x.clone().detach().cpu().numpy()
@@ -179,6 +155,15 @@ for epoch in range(epochs):
         loss.backward()
         losses.append(loss.item())
         losses_total.append(loss.item())
+
+        # for param in rewards.parameters():
+        #     print(param.requires_grad)
+        #
+        # for param in rewards.parameters():
+        #     if param.grad is None:
+        #         print("Grad is None")
+        #     else:
+        #         print(param.grad)
 
         # torch.nn.utils.clip_grad_norm_(rewards.parameters(), max_norm=1.0)
         optimizer.step()

@@ -6,14 +6,14 @@ import pickle
 
 
 def find_optimal_path(
-    value_func,
-    threat_map,
-    start_index,
-    destination,
-    neighbor_coords,
-    dim=(25, 25),
-    disp=True,
-    max_points=500,
+        value_func,
+        threat_map,
+        start_index,
+        destination,
+        neighbor_coords,
+        dim=(25, 25),
+        disp=True,
+        max_points=500,
 ):
     # value function should be a numpy array with dimensions as specified
     # start and end index should be an array. The index references the value function (1D array)
@@ -66,6 +66,8 @@ def find_optimal_path(
 
 
 def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
+    # my_field = max(my_field) - my_field
+
     # neighbors
     left_ind = my_neighbors.left.to_numpy()
     right_ind = my_neighbors.right.to_numpy()
@@ -73,11 +75,11 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     down_ind = my_neighbors.down.to_numpy()
 
     # current threat
-    my_threat = -1 * np.reshape(my_field[:-1], (625, 1))
-    left_vals = -1 * np.reshape(my_field[left_ind], (625, 1))
-    right_vals = -1 * np.reshape(my_field[right_ind], (625, 1))
-    up_vals = -1 * np.reshape(my_field[up_ind], (625, 1))
-    down_vals = -1 * np.reshape(my_field[down_ind], (625, 1))
+    my_threat = np.reshape(my_field[:-1], (625, 1))
+    left_vals = np.reshape(my_field[left_ind], (625, 1))
+    right_vals = np.reshape(my_field[right_ind], (625, 1))
+    up_vals = np.reshape(my_field[up_ind], (625, 1))
+    down_vals = np.reshape(my_field[down_ind], (625, 1))
 
     # euclidean distance
     distance = np.append(my_neighbors.dist.to_numpy(), 0)
@@ -101,10 +103,15 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     up_grady = np.reshape(grad_y[up_ind], (625, 1))
     down_grady = np.reshape(grad_y[down_ind], (625, 1))
 
-    high_threat = -1 * max(my_field)    # we already appended this value in the main part of this file
-    max_distance = 0    # 0 because the distance increases toward the final destination
-    high_grad = 0
-    outside_cell = np.tile(np.array([[high_threat, max_distance, high_grad, high_grad]]), 5)
+    high_threat = max(my_field)  # we already appended this value in the main part of this file
+    max_distance = 0  # 0 because the distance increases toward the final destination
+    high_gradx = max(grad_x)
+    high_grady = max(grad_y)
+    outside_cell = np.array([[high_threat, max_distance, high_gradx, high_grady,
+                              high_threat, max_distance, high_gradx, high_grady,
+                              high_threat, max_distance, high_gradx, high_grady,
+                              high_threat, max_distance, high_gradx, high_grady,
+                              high_threat, max_distance, high_gradx, high_grady,]])
 
     # want to group by cell, not by value type to make calling the reward function easier
     feature_func = np.concatenate(
@@ -167,7 +174,7 @@ if __name__ == "__main__":
 
         # save the threat field
         threat_map.append(threat["Threat Intensity"].to_numpy())
-        max_threat = 50 * max(threat["Threat Intensity"].to_numpy())
+        max_threat = max(threat["Threat Intensity"].to_numpy())
 
         # formatting for our pathfinder
         threat_field = np.append(threat["Threat Intensity"].to_numpy(), max_threat)
@@ -176,7 +183,8 @@ if __name__ == "__main__":
         grad_x2 = np.append(threat['Threat Gradient x_2'], 0)
 
         # create the feature map for this threat field
-        my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors, grad_x=grad_x1, grad_y=grad_x2)
+        my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors, grad_x=grad_x1,
+                                            grad_y=grad_x2)
         feature_map.append(my_feature_map)
         my_features = np.zeros(4)
 
@@ -223,7 +231,6 @@ if __name__ == "__main__":
 
     # single threat field example -> [154, 557,  34, 588, 188, 372, 616, 268, 31, 452, 338, 418, 13, 58, 266, 44, 20, 193,
     #  304, 513, 323, 198, 291, 200, 109]
-
 
     # newest run -> 250, 300, 254, 204, 135, 258, 305, 487, 117, 45, 616, 420, 577, 193, 579, 111, 32, 608,
     #  454, 344, 534, 416, 582, 116, 280
