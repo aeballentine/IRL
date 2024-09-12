@@ -29,7 +29,7 @@ torch.set_printoptions(linewidth=400)
 # threat field
 target_loc = 624  # final location in the threat field
 gamma = 0.99  # discount factor
-path_length = 30  # maximum number of points to keep along expert generated paths
+path_length = 10  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
 # feature dimensions
@@ -40,16 +40,16 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 400  # number of samples to take per batch
-learning_rate = 0.5  # learning rate
+learning_rate = 0.0001  # learning rate
 epochs = 1000  # number of epochs for the main training loop
 
 # value function
 tau = (
     0.0001  # rate at which to update the target_net variable inside the Q-learning module
 )
-LR = 0.5  # learning rate for Q-learning
+LR = 0.25  # learning rate for Q-learning
 q_criterion = (
-    nn.SmoothL1Loss()
+    nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 400  # batch size
 num_features = 20  # number of features to take into consideration
@@ -83,7 +83,12 @@ log.info("The device is: " + str(device))
 # constants for the network & initialize the reward model
 # my_features = torch.zeros(feature_dims)
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
-criterion = nn.CrossEntropyLoss(weight=torch.tensor([1, 0.8, 0.1, 0.1]).to(device))  # criterion to determine the loss
+criterion = nn.CrossEntropyLoss(weight=torch.tensor([2, 1.6, 0.2, 0.2,
+                                                     0.5, 0.4, 0.05, 0.05,
+                                                     0.5, 0.4, 0.05, 0.05,
+                                                     0.5, 0.4, 0.05, 0.05,
+                                                     0.5, 0.4, 0.05, 0.05,]).to(device)
+                                )  # criterion to determine the loss
 clipper = WeightClipper()
 log.info(rewards)
 

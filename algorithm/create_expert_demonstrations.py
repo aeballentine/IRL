@@ -131,7 +131,7 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
 
 def find_feature_expectation(coords, feature_function, discount):
     relevant_features = feature_function[coords]
-    relevant_features = relevant_features[:, :4]
+    relevant_features = relevant_features
     discount_factor = np.reshape(
         np.array(list(map(lambda x: pow(discount, x), range(len(coords))))),
         (len(coords), 1),
@@ -150,7 +150,7 @@ if __name__ == "__main__":
                        111, 504, 393, 588, 83, 27, 250]
     end_index = 624  # index of the final location
 
-    path_length = 30
+    path_length = 10
     gamma = 0.99
 
     # neighbors dataframe: this records all the neighbors of four
@@ -186,7 +186,7 @@ if __name__ == "__main__":
         my_feature_map = create_feature_map(my_field=threat_field, my_neighbors=neighbors, grad_x=grad_x1,
                                             grad_y=grad_x2)
         feature_map.append(my_feature_map)
-        my_features = np.zeros(4)
+        my_features = np.zeros(20)
 
         for loc in starting_coords:
             path, status = find_optimal_path(

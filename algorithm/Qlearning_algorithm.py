@@ -1,24 +1,29 @@
+"""
+This is the module used for q-learning in the main training loop
+Goal: train an agent to act according to the reward function
+Possible movements: left, right, up, and down
+"""
+
 import copy
-
 import numpy as np
-import torch
-from torch.utils.data import DataLoader
-from collections import namedtuple, deque
-import random
-from torch import nn
-import torch.nn.functional as func
-from torch import optim
 import math
-from itertools import count
+import random
+from collections import namedtuple, deque
+import torch
+from torch import nn
+from torch import optim
 
-from IRL_architecture import feature_avg, CustomPolicyDataset
-from IRL_utilities import new_position, MyLogger
+from IRL_utilities import MyLogger
 
 log = MyLogger(logging=False, debug_msgs=True)
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
 class ReplayMemory(object):
+    """
+   Class to hold state, next_state, action, reward information
+   Add to this throughout q-learning: this is the training data
+   """
     def __init__(self, capacity):
         self.memory = deque([], maxlen=capacity)
 
@@ -33,6 +38,10 @@ class ReplayMemory(object):
 
 
 class DQN(nn.Module):
+    """
+    Deep Q-Learning network
+    Trying a single linear layer
+    """
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
         self.layer1 = nn.Linear(n_observations, n_actions)
@@ -67,6 +76,7 @@ class DeepQ:
         self.memory = None  # memory class
         self.memory_length = memory_length  # how many past movements to store in memory
 
+        # policy and target networks
         self.policy_net = DQN(
             n_observations=self.n_observations, n_actions=self.n_actions
         ).to(device)
@@ -93,12 +103,13 @@ class DeepQ:
         # for reward calculations
         self.gamma = gamma  # discount factor
 
-        # for a single threat field
+        # coords to calculate the feature expectation
         self.starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
                                 111, 504, 393, 588, 83, 27, 250]
 
     def select_action(self, loc, features):
-        state = features[0, loc]
+        # input: loc (1d coordinate) and features (feature vector, 626x20)
+        state = features[loc]
         sample = random.random()
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(
             -1 * self.steps_done / self.EPS_DECAY
@@ -126,7 +137,7 @@ class DeepQ:
             action = np.inf
             neighbors = self.neighbors.loc[loc][1:5]
             for i, neighbor in enumerate(neighbors.to_numpy(dtype=np.uint32)):
-                threat = features[0, neighbor, 0]
+                threat = features[neighbor, 0]
                 if threat > threat_old:
                     action = i
                     threat_old = threat
@@ -199,7 +210,7 @@ class DeepQ:
         return loss
 
     def run_q_learning(self, features):
-        if self.loss > 0.05:     # todo: try 0.05 instead of 0.5...might lead to better convergence
+        if self.loss > 1:     # todo: try 0.05 instead of 0.5...might lead to better convergence
             self.policy_net = DQN(
                 n_observations=self.n_observations, n_actions=self.n_actions
             ).to(self.device)
@@ -227,7 +238,7 @@ class DeepQ:
                 loc = 623 - episode % 25
 
             feature = features[episode % len(features)]
-            action = self.select_action(loc, features=features)
+            action = self.select_action(loc, features=feature)
             terminated, finished, next_state, reward, state, action, loc = (
                 self.find_next_state(loc=loc, action=action, features=feature)
             )
@@ -287,7 +298,8 @@ class DeepQ:
             feature_function[coords + coords_conv]
         )
         new_features = copy.deepcopy(my_features).to(self.device)
-        my_features = my_features[:, :4].view(-1, 4).to(self.device)
+        # my_features = my_features[:, :4].view(-1, 4).to(self.device)
+        my_features = my_features.to(self.device)
         mask = np.ones(coords.shape, dtype=bool)
         finished_mask = np.ones(coords.shape, dtype=bool)
 
@@ -327,7 +339,7 @@ class DeepQ:
                     feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, 20).to(self.device)
                 )
                 # todo: note, changed this to step + 1...gamma is raised to the 0, 1, 2... and we start on the 2nd val
-                my_features[finished_mask] += self.gamma ** (step + 1) * new_features[:, :4]
+                my_features[finished_mask] += self.gamma ** (step + 1) * new_features
         # total number of paths
         total_paths = len(coords)
         not_finishes_failures = sum(mask)
