@@ -125,7 +125,7 @@ class DeepQ:
                     .cpu()
                     .numpy()
                 )    # choose an action according to the policy network
-                return action
+                return int(action)
         else:
             return np.random.randint(4)   # return a random action otherwise
 
