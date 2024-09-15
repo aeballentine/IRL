@@ -125,7 +125,7 @@ class DeepQ:
                     .cpu()
                     .numpy()
                 )    # choose an action according to the policy network
-                return action
+                return int(action)
         else:
             return np.random.randint(4)   # return a random action otherwise
 
@@ -141,7 +141,8 @@ class DeepQ:
             # return action
 
     def find_next_state(self, loc, action, features):
-        next_loc = self.neighbors.iloc[loc, action]    # given a known action, find the corresponding location
+        # todo: made this action + 1, check this
+        next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
         reward = self.reward(next_state).unsqueeze(0)
 
@@ -290,7 +291,7 @@ class DeepQ:
         # features used to calculate the desired action
         new_features = copy.deepcopy(my_features).to(self.device)
         # my_features = my_features[:, :4].view(-1, 4).to(self.device)
-        my_features = my_features.to(self.device)
+        my_features = my_features.to(self.device).abs()
 
         # mask for any finished paths (or terminated paths)
         mask = np.ones(coords.shape, dtype=bool)
@@ -302,7 +303,10 @@ class DeepQ:
                 action = (
                     self.policy_net(new_features).max(1).indices.cpu().numpy()
                 )  # determine the action according to the policy network
-
+                print("Features: \t", my_features)
+                print("Coordinates: \t", coords)
+                print("Action: \t", action)
+                print("----------")
                 coords[mask] = list(
                     map(
                         lambda index: self.neighbors.iloc[
@@ -321,18 +325,18 @@ class DeepQ:
                     mask[failures] = False
 
                 new_features = (
-                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, 20).to(self.device)
+                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
                 )   # find the features at the new location
                 # now add the features: should be gamma^t * new_features for t in [0, T]
                 # step starts at 0, we start at 1 because this is the 2nd point in the path
-                my_features[finished_mask] += self.gamma ** (step + 1) * new_features
+                my_features[finished_mask] += new_features.abs()   # self.gamma ** (step + 1) * new_features
 
         # total number of paths, then finishes and failures
         total_paths = len(coords)
         not_finishes_failures = sum(mask)
         not_finishes = sum(finished_mask)
         finishes = total_paths - not_finishes
-        failures = total_paths - not_finishes_failures - finishes
+        failures = total_paths - not_finishes_failures - finishes   # todo: check this, is the right math?
         log.debug(color='red', message='Number of failures \t' + str(failures))
         log.debug(color='red', message='Number of successes \t' + str(finishes))
 
