@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from IRL_utilities import MyLogger
 from IRL_utilities import neighbors_of_four
 
-log = MyLogger(logging=False, debug_msgs=True)
+log = MyLogger(logging=True, debug_msgs=True)
 Transition = namedtuple("Transition", ("state", "action", "next_state", "reward"))
 
 
@@ -48,10 +48,14 @@ class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, n_actions)
+        self.layer1 = nn.Linear(n_observations, 64)
+        self.layer2 = nn.Linear(64, 64)
+        self.layer3 = nn.Linear(64, n_actions)
 
     def forward(self, x):
-        return self.layer1(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        return self.layer3(x)
 
 
 class DeepQ:
@@ -97,7 +101,7 @@ class DeepQ:
         self.steps_done = 0  # to track for decay
         self.EPS_START = 0.9  # starting value
         self.EPS_END = 0.051  # lowest possible value
-        self.EPS_DECAY = 1000  # this was originally 1000
+        self.EPS_DECAY = 500  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -158,7 +162,7 @@ class DeepQ:
 
     def optimize_model(self):
         if len(self.memory) < self.batch_size:
-            return
+            return 100
 
         transitions = self.memory.sample(self.batch_size)  # generate a random sample for training
         batch = Transition(*zip(*transitions))
@@ -185,15 +189,15 @@ class DeepQ:
 
         # want loss between q_{my state} and R + gamma * q_{next state}
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
+
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
         loss.backward(retain_graph=True)
 
-        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
-
-        return loss
+        return loss.item()
 
     def run_q_learning(self, features):
         self.steps_done = 0
@@ -226,10 +230,10 @@ class DeepQ:
                                              ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
             self.target_net.load_state_dict(target_net_state_dict)
 
-            if not loss:
-                loss = 10
-            else:
-                loss = loss.item()
+            # if not loss:
+            #     loss = 10
+            # else:
+            #     pass
 
             log.info(
                 "Epoch: \t"
@@ -240,12 +244,13 @@ class DeepQ:
 
             loss_memory.append(loss)
 
-            if loss < self.min_accuracy:
+            if np.abs(loss) < self.min_accuracy:
                 break
 
         log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
         self.find_feature_expectation(feature_function=features)
+        torch.save(self.policy_net, 'q_learning/policy_net_gamma_06.pth')
 
     def find_feature_expectation(self, feature_function):
         n_threats = 1
@@ -279,15 +284,23 @@ class DeepQ:
             i = 0
 
             for step in range(self.path_length - 1):
+
+                i += 1
+
                 with torch.no_grad():
                     action = (
                         self.policy_net(new_feat).max(0).indices.clone().detach().cpu().numpy()
                     )  # this should be max(1) for multi-threat
+
                 # print("Neural network-chosen action: \t", action)
                 # neural network rewards
                 new_coord = self.neighbors.iloc[new_coord, int(action)]
+
+                if new_coord == 625:
+                    break
                 # print("Neural network next coordinate: \t", new_coord)
                 new_feat = feature_function[new_coord].to(self.device)
+
                 # print("Neural network next feature: \t", new_feat)
                 reward = 10 - new_feat[0]
                 nn_reward += reward.cpu().numpy()
@@ -300,27 +313,31 @@ class DeepQ:
                 # print("New feature function: \t", feature_function[coord])
                 reward = 10 - feature_function[coord, 0]
                 my_reward += reward.cpu().numpy()
-
-                i += 1
-
-                if action == 0:
-                    # print(coord)
-                    # print(nn_reward)
-                    break
+                #
+                # if action == 0:
+                #     # print(coord)
+                #     # print(nn_reward)
+                #     break
             rewards_vec.append(nn_reward / i)
             min_threat_rewards.append(my_reward / i)
 
         # print(rewards_vec)
         # print(min_threat_rewards)
 
-        plt.scatter(coords, rewards_vec, label='Neural Network Minimum Threat', marker='s')
-        plt.scatter(coords, min_threat_rewards, label='Minimum Threat Only', marker='+')
+        plt.scatter(coords, rewards_vec, label='Neural Network', marker='s')
+        plt.scatter(coords, min_threat_rewards, label='Greedy Algorithm', marker='+')
         plt.legend()
+        plt.title(r'$\gamma$=0.6')
+        plt.xlabel('Starting Coordinate')
+        plt.ylabel(r'$R_{avg}$')
         plt.show()
 
         rewards_vec = np.array(rewards_vec)
         min_threat_rewards = np.array(min_threat_rewards)
         plt.scatter(coords, rewards_vec - min_threat_rewards)
+        plt.title(r'$\gamma$=0.6')
+        plt.xlabel('Starting Coordinate')
+        plt.ylabel(r'$R_{avg, NN} - R_{avg, greedy}$')
         plt.show()
 
 
@@ -332,20 +349,20 @@ if __name__ == "__main__":
     # threat field
     target_loc_ = 624  # final location in the threat field
     gamma_ = 0.6  # discount factor
-    path_length_ = 100  # maximum number of points to keep along expert generated paths
+    path_length_ = 30  # maximum number of points to keep along expert generated paths
     dims = (25, 25)
 
     # MACHINE LEARNING PARAMETERS
     q_tau = (
-        0.0005  # rate at which to update the target_net variable inside the Q-learning module
+        0.00001  # rate at which to update the target_net variable inside the Q-learning module
     )
-    q_lr = 0.1  # learning rate
+    q_lr = 0.001  # learning rate
     q_criterion = (
-        nn.MSELoss()
+        nn.HuberLoss()
     )  # criterion to determine the loss during training (otherwise try hinge embedding)
     q_batch_size = 400  # batch size
     q_features = 5  # number of features to take into consideration
-    q_epochs = 2000  # number of epochs to iterate through for Q-learning
+    q_epochs = 3000  # number of epochs to iterate through for Q-learning
     q_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
     q_memory = 1000
 
@@ -385,6 +402,7 @@ if __name__ == "__main__":
 
     torch.set_printoptions(linewidth=200)
 
-    feature_function_ = np.reshape(feature_function_[0][:, [0, 4, 8, 12, 16]], (1, 626, 5))
+    feature_function_ = np.reshape(feature_function_[0][:, [0, 2, 4, 6, 8]], (1, 626, 5))
+    feature_function = np.abs(feature_function_)
     # print(feature_function)
-    q_learning.run_q_learning(features=torch.from_numpy(feature_function_).float())
+    q_learning.run_q_learning(features=torch.from_numpy(feature_function_).float().abs())

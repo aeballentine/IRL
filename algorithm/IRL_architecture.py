@@ -16,7 +16,7 @@ class RewardFunction(nn.Module):
     def __init__(self, feature_dim):
         super(RewardFunction, self).__init__()
         # initialize the weights as ones
-        self.weights = nn.Parameter(torch.ones(feature_dim))
+        self.weights = nn.Parameter(torch.zeros(feature_dim))
 
     def forward(self, features):
         # return the anticipated reward function

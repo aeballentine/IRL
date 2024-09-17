@@ -25,7 +25,7 @@ torch.set_printoptions(linewidth=800)
 # DATA PARAMETERS
 # threat field
 target_loc = 624  # final location in the threat field
-gamma = 0  # discount factor
+gamma = 0.8  # discount factor
 path_length = 10  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
@@ -37,21 +37,21 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 1  # number of samples to take per batch
-learning_rate = 1   # learning rate
+learning_rate = 0.01   # learning rate
 epochs = 1000  # number of epochs for the main training loop
 
 # value function
 q_tau = (
-    0.0001  # rate at which to update the target_net variable inside the Q-learning module
+    0.00001  # rate at which to update the target_net variable inside the Q-learning module
 )
-q_lr = 0.5  # learning rate for Q-learning
+q_lr = 0.001  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 400  # batch size
 q_features = 10  # number of features to take into consideration
-q_epochs = 2000  # number of epochs to iterate through for Q-learning
-q_accuracy = 0.1  # value to terminate Q-learning (if value is better than this)
+q_epochs = 3000  # number of epochs to iterate through for Q-learning
+q_accuracy = 0.001  # value to terminate Q-learning (if value is better than this)
 q_memory = 1000     # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -79,12 +79,13 @@ log.info("The device is: " + str(device))
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # constants for the network & initialize the reward model
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
-criterion = nn.CrossEntropyLoss().to(device)   # weight=torch.tensor([2, 1.6, 0.2, 0.2,
+# criterion = nn.CrossEntropyLoss().to(device)   # weight=torch.tensor([2, 1.6, 0.2, 0.2,
                                                #         0.5, 0.4, 0.05, 0.05,
                                                #         0.5, 0.4, 0.05, 0.05,
                                                #         0.5, 0.4, 0.05, 0.05,
                                                #         0.5, 0.4, 0.05, 0.05,]).to(device)
                                 # )  # criterion to determine the loss
+criterion = nn.HuberLoss()
 log.info(rewards)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,6 +138,8 @@ for epoch in range(epochs):
         output = q_learning.run_q_learning(features=x)
         log.info("Q-learning completed")
 
+        print(output.shape)
+        print(y.shape)
         loss = criterion(output, y)
         log.info(message=output[:5])
         log.info(message=y[:5])
@@ -148,7 +151,7 @@ for epoch in range(epochs):
         losses_total.append(loss.item())
 
         # can try this, but parameters look to be independent now
-        torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
+        # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
 
         optimizer.step()
         log.debug(message=rewards.state_dict())

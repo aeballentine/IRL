@@ -297,51 +297,91 @@ class DeepQ:
         mask = np.ones(coords.shape, dtype=bool)
         finished_mask = np.ones(coords.shape, dtype=bool)
 
-        for step in range(self.path_length - 1):    # path length - 1 because the first coordinate counts too
+        finishes = 0
+        failures = 0
 
-            with torch.no_grad():
+        my_features = torch.tensor([]).to(self.device)
+        for coord in coords:    # todo: match this to the expert demonstrations, check each point
+            new_features = feature_function[[coord]].to(self.device)
+            # print(new_features)
+            my_features = torch.cat([my_features, new_features.abs()])
+            for step in range(self.path_length - 1):    # path length - 1 because the first coordinate counts too
+
+                # with torch.no_grad():
+                # print(self.policy_net(new_features))
+
                 action = (
                     self.policy_net(new_features).max(1).indices.cpu().numpy()
                 )  # determine the action according to the policy network
-                print("Features: \t", my_features)
-                print("Coordinates: \t", coords)
-                print("Action: \t", action)
-                print("----------")
-                coords[mask] = list(
-                    map(
-                        lambda index: self.neighbors.iloc[
-                            index[1], action[index[0]] + 1
-                        ],
-                        enumerate(coords[mask]),
-                    )
-                )   # find the next coordinate according to the initial location and action
+                # print("Features: \t", my_features)
+                # print("Coordinates: \t", coords)
+                # print("Action: \t", action)
+                # print("----------")
 
-                ind = np.where(coords == self.target_loc)
-                if ind:
-                    mask[ind] = False
-                    finished_mask[ind] = False
-                failures = np.where(coords == self.target_loc + 1)
-                if failures:
-                    mask[failures] = False
+                # print(action[0])
+                coord = self.neighbors.iloc[coord, action[0] + 1]
+                # print(coord)
+                new_features = feature_function[[coord]].to(self.device)
 
-                new_features = (
-                    feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
-                )   # find the features at the new location
-                # now add the features: should be gamma^t * new_features for t in [0, T]
-                # step starts at 0, we start at 1 because this is the 2nd point in the path
-                my_features[finished_mask] += new_features.abs()   # self.gamma ** (step + 1) * new_features
+                # coords[mask] = list(
+                #     map(
+                #         lambda index: self.neighbors.iloc[
+                #             index[1], action[index[0]] + 1
+                #         ],
+                #         enumerate(coords[mask]),
+                #     )
+                # )   # find the next coordinate according to the initial location and action
+
+                my_features = torch.cat([my_features, new_features.abs()])
+                if coord == 624:
+                    # find how many moves we've made
+                    zeros = torch.zeros(1, self.n_observations)
+                    points_remaining = self.path_length - 2 - step
+                    to_append = zeros.repeat(points_remaining, 1).to(self.device)
+                    my_features = torch.cat([my_features, to_append])
+                    finishes += 1
+                    break
+
+                elif coord == 625:
+                    maxis = my_features[-1]
+                    points_remaining = self.path_length - 2 - step
+                    to_append = maxis.repeat(points_remaining, 1)
+                    # print(my_features.shape)
+                    # print(to_append.shape)
+                    my_features = torch.cat([my_features, to_append.abs()])
+                    failures += 1
+                    break
+
+                else:
+                    continue
+
+                # ind = np.where(coords == self.target_loc)
+                # if ind:
+                #     mask[ind] = False
+                #     finished_mask[ind] = False
+                # failures = np.where(coords == self.target_loc + 1)
+                # if failures:
+                #     mask[failures] = False
+                #
+                # new_features = (
+                #     feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
+                # )   # find the features at the new location
+                # # now add the features: should be gamma^t * new_features for t in [0, T]
+                # # step starts at 0, we start at 1 because this is the 2nd point in the path
+                # my_features[finished_mask] = torch.cat((my_features, new_features.abs()))   # self.gamma ** (step + 1) * new_features
 
         # total number of paths, then finishes and failures
-        total_paths = len(coords)
-        not_finishes_failures = sum(mask)
-        not_finishes = sum(finished_mask)
-        finishes = total_paths - not_finishes
-        failures = total_paths - not_finishes_failures - finishes   # todo: check this, is the right math?
+        # total_paths = len(coords)
+        # not_finishes_failures = sum(mask)
+        # not_finishes = sum(finished_mask)
+        # finishes = total_paths - not_finishes
+        # failures = total_paths - not_finishes_failures - finishes   # check this, is the right math?
         log.debug(color='red', message='Number of failures \t' + str(failures))
         log.debug(color='red', message='Number of successes \t' + str(finishes))
 
         # formatting to return the calculated feature function
-        n_returns = len(self.starting_coords)
-        reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
-        feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
-        return feature_sums
+        # n_returns = len(self.starting_coords)
+        # reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
+        # feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
+
+        return my_features.view(1, len(my_features), self.n_observations)
