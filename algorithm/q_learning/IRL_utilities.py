@@ -24,8 +24,8 @@ def neighbors_of_four(dims, target):
     target = to_2d(target, dims)
 
     # euclidean distance to the target location
-    x_distance = 2 - (coords[1] - target[1]) / 12
-    y_distance = 2 - (coords[0] - target[0]) / 12
+    x_distance = (target[1] - coords[1]) / 12
+    y_distance = (target[0] - coords[0]) / 12
     dist = (x_distance**2 + y_distance ** 2) ** 0.5
     coords = np.concatenate(
         (np.reshape(coords[0], (size, 1)), np.reshape(coords[1], (size, 1))), axis=1
@@ -120,14 +120,14 @@ class MyLogger:
 if __name__ == "__main__":
     # below is testing
     x = np.flip(np.reshape(np.arange(0, 25, 1), (5, 5)), axis=0)
-    print(x)
-    df = neighbors_of_four((5, 5), 24)
-    print(6)
-    print(to_2d(6, (5, 5)))
-    print(to_1d([1, 1], (5, 5)))
+    # print(x)
+    df = neighbors_of_four((25, 25), 624)
+    # print(6)
+    # print(to_2d(6, (5, 5)))
+    # print(to_1d([1, 1], (5, 5)))
     print(df)
     y = np.array([1, 3, 5])
     [a, b] = to_2d(np.array([1, 2]), (5, 5))
-    print(type(a))
-    print(b)
+    # print(type(a))
+    # print(b)
     # print(df.loc[y, "left"])

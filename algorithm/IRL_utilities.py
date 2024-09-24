@@ -24,8 +24,8 @@ def neighbors_of_four(dims, target):
     target = to_2d(target, dims)
 
     # euclidean distance to the target location
-    x_distance = 2 - (coords[1] - target[1]) / 12
-    y_distance = 2 - (coords[0] - target[0]) / 12
+    x_distance = (target[1] - coords[1])
+    y_distance = (target[0] - coords[0])
     dist = (x_distance**2 + y_distance ** 2) ** 0.5
     coords = np.concatenate(
         (np.reshape(coords[0], (size, 1)), np.reshape(coords[1], (size, 1))), axis=1

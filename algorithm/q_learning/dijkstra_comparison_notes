@@ -1,0 +1,45 @@
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+NN file:
+    policy_net_single_threat
+Training parameters:
+    q_lr = 0.001  # learning rate
+    q_criterion = (
+        nn.HuberLoss()
+    )  # criterion to determine the loss during training (otherwise try hinge embedding)
+    q_batch_size = 500  # batch size
+    q_features = 10  # number of features to take into consideration
+    q_epochs = 500  # number of epochs to iterate through for Q-learning
+    q_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
+    q_memory = 500
+    > batch size for 9 is 400 instead of 500
+Reward function:
+    -(c_{i+1} + d_{i+1})
+    > +100 for reaching the goal
+Appropriate feature function:
+    single_threat_dijkstra
+    - threat is on original range
+    - distance scale is 1 cell to 1 unit length
+    - penalty for leaving is 10 times the maximum threat & 2 times the maximum distance
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+NN file:
+    policy_net_multi_threat
+Training parameters:
+    q_lr = 0.001  # learning rate
+    q_criterion = (
+        nn.HuberLoss()
+    )  # criterion to determine the loss during training (otherwise try hinge embedding)
+    q_batch_size = 500  # batch size
+    q_features = 10  # number of features to take into consideration
+    q_epochs = 500  # number of epochs to iterate through for Q-learning
+    q_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
+    q_memory = 500
+    > batch size for 9 is 400 instead of 500
+Reward function:
+    -(c_{i+1} + 2 * d_{i+1})
+    > +100 for reaching the goal
+Appropriate feature function:
+    multi_threat_dijkstra
+    - threat is on [0, 1]
+    - distance scale is 1 cell to 1 unit length, then normalized on [0, 5]
+    - penalty for leaving is 10 times the maximum threat & 2 times the maximum distance

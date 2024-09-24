@@ -1,6 +1,7 @@
 import glob
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import minmax_scale
 from IRL_utilities import neighbors_of_four, to_2d
 
 
@@ -66,6 +67,9 @@ def find_optimal_path(
 
 def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     # my_field = max(my_field) - my_field
+    # normalization on [0, 1]
+    my_field = minmax_scale(my_field, feature_range=(0, 1))
+    my_field[-1] = 10 * max(my_field)   # last value represents the values outside the threat field, increasing this
 
     # neighbors
     left_ind = my_neighbors.left.to_numpy()
@@ -81,7 +85,9 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     down_vals = np.reshape(my_field[down_ind], (625, 1))
 
     # euclidean distance
-    distance = np.append(my_neighbors.dist.to_numpy(), 0)
+    max_distance = max(my_neighbors.dist.to_numpy())
+    distance = np.append(my_neighbors.dist.to_numpy(), 2 * max_distance)
+    distance = minmax_scale(distance, feature_range=(0, 5))
     left_dist = np.reshape(distance[left_ind], (625, 1))
     right_dist = np.reshape(distance[right_ind], (625, 1))
     up_dist = np.reshape(distance[up_ind], (625, 1))
@@ -103,10 +109,10 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     down_grady = np.reshape(grad_y[down_ind], (625, 1))
 
     high_threat = max(my_field)  # we already appended this value in the main part of this file
-    max_distance = 0  # 0 because the distance increases toward the final destination
+    max_distance = max(distance)[0]  # because the distance decreases toward the final destination
     high_gradx = max(grad_x)
     high_grady = max(grad_y)
-    outside_cell = np.array([[10 * high_threat, max_distance,  # high_gradx, high_grady,
+    outside_cell = np.array([[high_threat, max_distance,  # high_gradx, high_grady,
                               high_threat, max_distance,  # high_gradx, high_grady,
                               high_threat, max_distance,  # high_gradx, high_grady,
                               high_threat, max_distance,  # high_gradx, high_grady,
@@ -170,7 +176,7 @@ if __name__ == "__main__":
     feature_map = []  # feature map for each point in the threat field
     threat_map = []  # need this to map paths for visualization
 
-    for file in file_list[:1]:
+    for file in file_list[:50]:
         threat = pd.read_csv(file)  # all the data for the threat field
 
         # save the threat field

@@ -8,10 +8,12 @@ import numpy as np
 import pandas as pd
 import math
 import random
+from itertools import count
 from collections import namedtuple, deque
 import torch
 from torch import nn
 from torch import optim
+import torch.nn.functional as func
 import matplotlib.pyplot as plt
 
 from IRL_utilities import MyLogger
@@ -48,14 +50,16 @@ class DQN(nn.Module):
 
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, 64)
-        self.layer2 = nn.Linear(64, 64)
-        self.layer3 = nn.Linear(64, n_actions)
+        self.layer1 = nn.Linear(n_observations, 128)
+        self.layer2 = nn.Linear(128, 625)
+        self.layer3 = nn.Linear(625, 128)
+        self.layer4 = nn.Linear(128, n_actions)
 
     def forward(self, x):
         x = self.layer1(x)
         x = self.layer2(x)
-        return self.layer3(x)
+        x = self.layer3(x)
+        return self.layer4(x)
 
 
 class DeepQ:
@@ -99,9 +103,9 @@ class DeepQ:
 
         # epsilon parameters
         self.steps_done = 0  # to track for decay
-        self.EPS_START = 0.9  # starting value
+        self.EPS_START = 0.91  # starting value
         self.EPS_END = 0.051  # lowest possible value
-        self.EPS_DECAY = 500  # this was originally 1000
+        self.EPS_DECAY = 1000  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -111,6 +115,7 @@ class DeepQ:
 
         # for a single threat field
         self.starting_coords = np.arange(0, 624, 1)
+        self.nn_calc = None
 
     def select_action(self, loc, features):
         state = features[0, loc]  # features is a (1, 626, 5) vector, so choose the row corresponding to the loc
@@ -120,6 +125,7 @@ class DeepQ:
         )  # threshold, based on iterations of the network, so this decreases as the network learns
         self.steps_done += 1
         if sample > eps_threshold:
+            self.nn_calc += 1
             with torch.no_grad():
                 action = (
                     self.policy_net(state.to(self.device))
@@ -128,15 +134,25 @@ class DeepQ:
                     .detach()
                     .cpu()
                     .numpy()
-                )  # choose an action according to the policy network
+                )  # choose an action according to the policy network todo: here changed this to min
                 return int(action)
         else:
-            return np.random.randint(5)  # return a random action otherwise
+            # return np.random.randint(4)  # return a random action otherwise
+            pick_action = np.random.randint(4)
+            opposite_actions = np.array([1, 0, 3, 2])
+            if self.neighbors.iloc[loc, pick_action + 1] != 625:
+                return pick_action
+            else:
+                return int(opposite_actions[pick_action])
 
     def find_next_state(self, loc, action, features):
-        next_loc = self.neighbors.iloc[loc, action]  # given a known action, find the corresponding location
+        next_loc = self.neighbors.iloc[loc, action + 1]  # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
-        reward = 4 * (10 - next_state[0].unsqueeze(0).to(self.device))  # reward associated with the next state
+        # R(s, a, s') = 4 * (10 - c(s') - b)
+        # where b is 1 if not at the goal and 0 at the goal state
+        # reward = 5 * (10 - next_state[0].unsqueeze(0).to(self.device))
+        reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
+        # - 2 * next_state[1])  # reward associated with the next state
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)
@@ -146,16 +162,21 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = next_state.unsqueeze(0)
+            reward += 100   # cost is zero at the destination
 
         elif next_loc == 625:
             terminated = True
             finished = False
-            next_state = None
+            # next_state = None
+            next_state = next_state.unsqueeze(0)
+            # reward += 50
+            # reward -= 5
 
         else:
             terminated = False
             finished = False
             next_state = next_state.unsqueeze(0)
+            # reward -= 5
 
         # formatting
         return terminated, finished, next_state, reward, state, action, next_loc
@@ -185,7 +206,7 @@ class DeepQ:
         with torch.no_grad():
             next_state_values[non_final_mask] = (
                 self.target_net(non_final_next_states).max(1).values
-            )  # value at the next state
+            )  # value at the next state   todo: changed this to a negative
 
         # want loss between q_{my state} and R + gamma * q_{next state}
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
@@ -201,56 +222,121 @@ class DeepQ:
 
     def run_q_learning(self, features):
         self.steps_done = 0
-        loss_memory = []
+        # loss_memory = []
+        num_features = len(features)
 
         for episode in range(self.num_epochs):
-            # pick a random place to start
+            # hard update
+            if episode % 50 == 0:
+                policy_net_state_dict = self.policy_net.state_dict()
+                self.target_net.load_state_dict(policy_net_state_dict)
+
             loc = np.random.randint(624)
+            self.nn_calc = 0
 
-            feature = features[0]
+            feature_ind = np.random.randint(num_features)
+            feature = features[feature_ind]
 
-            # choose an action based on the starting location
-            action = self.select_action(loc, features=features)
-            terminated, finished, next_state, reward, state, action, loc = (
-                self.find_next_state(loc=loc, action=action, features=feature)
-            )
+            loss_memory = []
+            for t in count():
+                # pick a random place to start
+                # feature = features[0]
 
-            # add the action to memory
-            self.memory.push(state, action, next_state, reward)
+                # random sampling from an "expert" path
+                # if (t % 5 == 0) and (episode < 100):
+                #     if self.neighbors.iloc[loc, 3] != 625:
+                #         action = 2
+                #     else:
+                #         action = 1
+                # else:
+                #     # choose an action based on the starting location
+                action = self.select_action(loc, features=features)
 
-            # run the optimizer
-            loss = self.optimize_model()
+                terminated, finished, next_state, reward, state, action, loc = (
+                    self.find_next_state(loc=loc, action=action, features=feature)
+                )
 
-            # update the target network with a soft update: θ′ ← τ θ + (1 - τ )θ′
-            target_net_state_dict = self.target_net.state_dict()
-            policy_net_state_dict = self.policy_net.state_dict()
-            for key in policy_net_state_dict:
-                target_net_state_dict[key] = policy_net_state_dict[
-                                                 key
-                                             ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
-            self.target_net.load_state_dict(target_net_state_dict)
+                # add the action to memory
+                self.memory.push(state, action, next_state, reward)
 
-            # if not loss:
-            #     loss = 10
-            # else:
-            #     pass
+                # run the optimizer
+                loss = self.optimize_model()
+
+                # update the target network with a soft update: θ′ ← τ θ + (1 - τ )θ′
+                # target_net_state_dict = self.target_net.state_dict()
+                # policy_net_state_dict = self.policy_net.state_dict()
+                # for key in policy_net_state_dict:
+                #     target_net_state_dict[key] = policy_net_state_dict[
+                #                                      key
+                #                                  ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
+                # self.target_net.load_state_dict(target_net_state_dict)
+
+                # if not loss:
+                #     loss = 10
+                # else:
+                #     pass
+
+                loss_memory.append(loss)
+
+                if loc == 624:
+                    log.debug(color='blue', message='Found finish, total iterations: \t' + str(t))
+                    break
+                elif loc == 625:
+                    log.debug(color='red', message='Exited the graph, total iterations: \t' + str(t))
+                    break
+                elif t > 100:
+                    break
 
             log.info(
                 "Epoch: \t"
                 + str(episode)
                 + " \t Final Loss Calculated: \t"
-                + str(np.round(loss, 6))
+                + str(np.average(np.array(loss_memory)))
             )
-
-            loss_memory.append(loss)
-
-            if np.abs(loss) < self.min_accuracy:
+            if np.average(np.array(loss_memory)) < self.min_accuracy:
                 break
+            # log.debug(color='red', message=str(self.nn_calc))
+            log.debug(message='Final location \t' + str(loc) + '\t Final Threat \t' + str(feature[loc][0]))
+            print(' ')
+
+            # if np.mean(loss_memory[-10:]) < self.min_accuracy:
+            #     break
 
         log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
-        self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_gamma_06.pth')
+        # self.find_feature_expectation(feature_function=features)
+        torch.save(self.policy_net, 'q_learning/policy_net_target_14.pth')
+        self.check_convergence(feature_function=features)
+
+    def check_convergence(self, feature_function):
+        coords = np.random.randint(0, 624, size=(40,))
+        feature_function = feature_function.view(-1, self.n_observations)
+
+        for coord in coords:
+            new_coord = coord
+            new_feat = feature_function[new_coord].to(self.device)
+            for step in range(100):
+                with torch.no_grad():
+                    action = (
+                        self.policy_net(new_feat).max(0).indices.clone().detach().cpu().numpy()     # todo: this is now min
+                    )  # this should be max(1) for multi-threat
+                # print("Neural network-chosen action: \t", action)
+                # neural network rewards
+                new_coord = self.neighbors.iloc[new_coord, int(action) + 1]
+
+                if new_coord == 625:
+                    print('terminated outside the graph')
+                    break
+
+                elif new_coord == 624:
+                    print("Success!")
+                    break
+
+                # print("Neural network next coordinate: \t", new_coord)
+                new_feat = feature_function[new_coord].to(self.device)
+
+                if step == 99:
+                    print('failed')
 
     def find_feature_expectation(self, feature_function):
         n_threats = 1
@@ -294,7 +380,7 @@ class DeepQ:
 
                 # print("Neural network-chosen action: \t", action)
                 # neural network rewards
-                new_coord = self.neighbors.iloc[new_coord, int(action)]
+                new_coord = self.neighbors.iloc[new_coord, int(action) + 1]
 
                 if new_coord == 625:
                     break
@@ -308,7 +394,7 @@ class DeepQ:
                 # my rewards: moving only toward the minimum threat
                 my_action = feature_function[coord].min(0).indices
                 # print("Action according to the minimum threat: \t", action)
-                coord = self.neighbors.iloc[coord, int(my_action)]
+                coord = self.neighbors.iloc[coord, int(my_action) + 1]
                 # print("My new coordinate: \t", coord)
                 # print("New feature function: \t", feature_function[coord])
                 reward = 10 - feature_function[coord, 0]
@@ -348,23 +434,23 @@ if __name__ == "__main__":
     # DATA PARAMETERS
     # threat field
     target_loc_ = 624  # final location in the threat field
-    gamma_ = 0.6  # discount factor
+    gamma_ = 1  # discount factor
     path_length_ = 30  # maximum number of points to keep along expert generated paths
     dims = (25, 25)
 
     # MACHINE LEARNING PARAMETERS
     q_tau = (
-        0.00001  # rate at which to update the target_net variable inside the Q-learning module
+        0.0001  # rate at which to update the target_net variable inside the Q-learning module
     )
-    q_lr = 0.001  # learning rate
+    q_lr = 0.01  # learning rate
     q_criterion = (
         nn.HuberLoss()
     )  # criterion to determine the loss during training (otherwise try hinge embedding)
-    q_batch_size = 400  # batch size
-    q_features = 5  # number of features to take into consideration
-    q_epochs = 3000  # number of epochs to iterate through for Q-learning
-    q_accuracy = 1.5e-2  # value to terminate Q-learning (if value is better than this)
-    q_memory = 1000
+    q_batch_size = 500  # batch size
+    q_features = 10  # number of features to take into consideration
+    q_epochs = 1000  # number of epochs to iterate through for Q-learning
+    q_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
+    q_memory = 500
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # NEIGHBORS OF FOUR
@@ -373,7 +459,8 @@ if __name__ == "__main__":
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # LOAD THE DATA
     data = pd.read_pickle('expert_demonstrations/multi_threat.pkl')
-    feature_function_ = data.feature_map
+    feature_function_ = data.feature_map.to_numpy()
+    feature_function_ = np.concatenate(feature_function_)
 
     log.info("Expert feature average calculated")
 
@@ -385,7 +472,7 @@ if __name__ == "__main__":
 
     q_learning = DeepQ(
         n_observations=q_features,
-        n_actions=5,
+        n_actions=4,
         device=device_,
         LR=q_lr,
         neighbors=neighbors_,
@@ -401,8 +488,8 @@ if __name__ == "__main__":
     )
 
     torch.set_printoptions(linewidth=200)
-
-    feature_function_ = np.reshape(feature_function_[0][:, [0, 2, 4, 6, 8]], (1, 626, 5))
-    feature_function = np.abs(feature_function_)
+    feature_function_ = torch.from_numpy(feature_function_).view(-1, 626, q_features).float().abs()
+    # feature_function_ = np.reshape(feature_function_, (-1, 626, q_features))
+    # feature_function = np.abs(feature_function_)
     # print(feature_function)
-    q_learning.run_q_learning(features=torch.from_numpy(feature_function_).float().abs())
+    q_learning.run_q_learning(features=feature_function_)
