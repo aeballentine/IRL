@@ -68,7 +68,7 @@ def find_optimal_path(
 def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     # my_field = max(my_field) - my_field
     # normalization on [0, 1]
-    my_field = minmax_scale(my_field, feature_range=(0, 1))
+    # my_field = minmax_scale(my_field, feature_range=(0, 1))
     my_field[-1] = 10 * max(my_field)   # last value represents the values outside the threat field, increasing this
 
     # neighbors
@@ -87,7 +87,7 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     # euclidean distance
     max_distance = max(my_neighbors.dist.to_numpy())
     distance = np.append(my_neighbors.dist.to_numpy(), 2 * max_distance)
-    distance = minmax_scale(distance, feature_range=(0, 5))
+    # distance = minmax_scale(distance, feature_range=(0, 5))
     left_dist = np.reshape(distance[left_ind], (625, 1))
     right_dist = np.reshape(distance[right_ind], (625, 1))
     up_dist = np.reshape(distance[up_ind], (625, 1))
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     feature_map = []  # feature map for each point in the threat field
     threat_map = []  # need this to map paths for visualization
 
-    for file in file_list[:50]:
+    for file in file_list[:1]:
         threat = pd.read_csv(file)  # all the data for the threat field
 
         # save the threat field
@@ -227,6 +227,6 @@ if __name__ == "__main__":
         "threat_field": threat_map,
     }
     expert_information = pd.DataFrame(expert_information)
-    expert_information.to_pickle("expert_demonstrations/multi_threat.pkl")
+    expert_information.to_pickle("expert_demonstrations/single_threat.pkl")
 
     # print(', '.join(map(lambda x: str(x), starting_coords)))

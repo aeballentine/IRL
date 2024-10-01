@@ -42,7 +42,7 @@ epochs = 1000  # number of epochs for the main training loop
 
 # value function
 q_tau = (
-    0.00001  # rate at which to update the target_net variable inside the Q-learning module
+    0.99  # rate at which to update the target_net variable inside the Q-learning module
 )
 q_lr = 0.001  # learning rate for Q-learning
 q_criterion = (
@@ -50,7 +50,7 @@ q_criterion = (
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 400  # batch size
 q_features = 10  # number of features to take into consideration
-q_epochs = 3000  # number of epochs to iterate through for Q-learning
+q_epochs = 500  # number of epochs to iterate through for Q-learning
 q_accuracy = 0.001  # value to terminate Q-learning (if value is better than this)
 q_memory = 1000     # memory length for Q-learning
 
@@ -156,17 +156,17 @@ for epoch in range(epochs):
         optimizer.step()
         log.debug(message=rewards.state_dict())
 
-        # variable learning rate
-        if loss.item() < 50:
-            new_rate = learning_rate / 100
-        elif loss.item() < 10:
-            new_rate = learning_rate / 1000
-        else:
-            new_rate = learning_rate
-
-        # update the learning rate accordingly
-        for g in optimizer.param_groups:
-            g['lr'] = new_rate
+        # # variable learning rate
+        # if loss.item() < 50:
+        #     new_rate = learning_rate / 100
+        # elif loss.item() < 10:
+        #     new_rate = learning_rate / 1000
+        # else:
+        #     new_rate = learning_rate
+        #
+        # # update the learning rate accordingly
+        # for g in optimizer.param_groups:
+        #     g['lr'] = new_rate
 
         log.debug(
             color="blue",

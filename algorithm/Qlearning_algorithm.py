@@ -9,6 +9,7 @@ import numpy as np
 import math
 import random
 from collections import namedtuple, deque
+from itertools import count
 import torch
 from torch import nn
 from torch import optim
@@ -44,14 +45,16 @@ class DQN(nn.Module):
     """
     def __init__(self, n_observations, n_actions):
         super(DQN, self).__init__()
-        self.layer1 = nn.Linear(n_observations, n_actions)
-        # self.layer2 = nn.Linear(128, 128)
-        # self.layer3 = nn.Linear(128, n_actions)
+        self.layer1 = nn.Linear(n_observations, 128)
+        self.layer2 = nn.Linear(128, 625)
+        self.layer3 = nn.Linear(625, 128)
+        self.layer4 = nn.Linear(128, n_actions)
 
     def forward(self, x):
-        # x = func.relu(self.layer1(x))
-        # x = func.relu(self.layer2(x))
-        return self.layer1(x)
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        return self.layer4(x)
 
 
 class DeepQ:
@@ -93,9 +96,9 @@ class DeepQ:
 
         # epsilon parameters
         self.steps_done = 0     # to track for decay
-        self.EPS_START = 0.9    # starting value
+        self.EPS_START = 0.91    # starting value
         self.EPS_END = 0.051    # lowest possible value
-        self.EPS_DECAY = 500  # this was originally 1000
+        self.EPS_DECAY = 1000  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -158,7 +161,7 @@ class DeepQ:
         elif next_loc == 625:
             terminated = True
             finished = False
-            next_state = None
+            next_state = next_state.unsqueeze(0)
 
         else:
             terminated = False
@@ -203,7 +206,7 @@ class DeepQ:
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
-        return loss
+        return loss.item()
 
     def run_q_learning(self, features):
         # input features (a nx626x20 vector: first dimension indicates the number of threat fields used for training)
@@ -224,39 +227,49 @@ class DeepQ:
         loss_memory = []
 
         for episode in range(self.num_epochs):
-            # pick a random place to start
-            loc = np.random.randint(624)
+            for t in count():
+                # pick a random place to start
+                loc = np.random.randint(624)
 
-            # pick one of the threat fields and just rotate through as we continue training
-            feature = features[episode % len(features)]
+                # pick one of the threat fields and just rotate through as we continue training
+                feature = features[episode % len(features)]
 
-            # choose an action based on the starting location
-            action = self.select_action(loc, features=feature)
-            terminated, finished, next_state, reward, state, action, loc = (
-                self.find_next_state(loc=loc, action=action, features=feature)
-            )
+                # choose an action based on the starting location
+                action = self.select_action(loc, features=feature)
+                terminated, finished, next_state, reward, state, action, loc = (
+                    self.find_next_state(loc=loc, action=action, features=feature)
+                )
 
-            # add the action to memory
-            self.memory.push(state, action, next_state, reward)
+                # add the action to memory
+                self.memory.push(state, action, next_state, reward)
 
-            # run the optimizer
-            loss = self.optimize_model()
+                # run the optimizer
+                loss = self.optimize_model()
 
-            # update the target network with a soft update: θ′ ← τ θ + (1 - τ )θ′
-            target_net_state_dict = self.target_net.state_dict()
-            policy_net_state_dict = self.policy_net.state_dict()
-            for key in policy_net_state_dict:
-                target_net_state_dict[key] = policy_net_state_dict[
-                    key
-                ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
-            self.target_net.load_state_dict(target_net_state_dict)
+                # update the target network with a soft update: θ′ ← τ θ + (1 - τ )θ′
+                target_net_state_dict = self.target_net.state_dict()
+                policy_net_state_dict = self.policy_net.state_dict()
+                for key in policy_net_state_dict:
+                    target_net_state_dict[key] = policy_net_state_dict[
+                        key
+                    ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
+                self.target_net.load_state_dict(target_net_state_dict)
 
-            if not loss:
-                loss = 10
-            else:
-                loss = loss.item()
+                if not loss:
+                    loss = 10
+                else:
+                    loss = loss
 
-            if episode % 200 == 0:
+                if loc == 624:
+                    log.debug(color='blue', message='Found finish, total iterations: \t' + str(t))
+                    break
+                elif loc == 625:
+                    log.debug(color='red', message='Exited the graph, total iterations: \t' + str(t))
+                    break
+                elif t > 100:
+                    break
+
+            if episode % 50 == 0:
                 log.debug(
                     "Epoch: \t"
                     + str(episode)
@@ -384,4 +397,4 @@ class DeepQ:
         # reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
         # feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
 
-        return my_features.view(1, len(my_features), self.n_observations)
+        return my_features.view(-1, len(my_features), self.n_observations)

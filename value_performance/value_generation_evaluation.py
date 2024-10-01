@@ -100,6 +100,8 @@ error_value_to_cost = []
 error_path_actual = []
 value_func = []
 
+percent_error = []
+
 # number of times that the path finding algorithms fail
 by4_fail = 0
 
@@ -172,6 +174,7 @@ for i, my_threat in enumerate(sample):
             error_value_to_cost.append((costgen_4by - value_gen))
             error_path_actual.append(costgen_4by - cost_4by)
             value_func.append(costgen_4by)
+            percent_error.append(100 * (costgen_4by - cost_4by) / cost_4by)
             if costgen_4by - cost_4by < 0:
                 print("Cost gen smaller: ", costgen_4by - cost_4by)
         else:
@@ -227,13 +230,13 @@ plt.rcParams["font.serif"] = ["Times New Roman"]
 plt.rcParams['font.size'] = 18
 
 # plot the difference between the neural network and Dijkstra's algorithm (positive means Dijkstra's won)
-plt.scatter(value_func, error_path_actual, c='tab:blue', s=7.5)
-plt.xlabel('Minimum Cost (Dijkstra)', fontdict={'size': 20})
-plt.ylabel('Neural Network Cost Error', fontdict={'size': 20})
-plt.ylim([-0.1, 12])
+plt.scatter(value_func, percent_error, c='tab:blue', s=7.5)
+plt.xlabel('Minimum Cost', fontdict={'size': 20})
+plt.ylabel(r'Percent Error - $J_{NN}$ and $J^*$', fontdict={'size': 20})
+plt.ylim([-0.1, 40])
 plt.xlim([0, 150])
 
-plt.annotate(r'$\bar{x}$: ' + str(mean_path), xy=(5, 11.5), horizontalalignment='left', verticalalignment='top', fontsize=15)
-plt.annotate(r'$\sigma$: ' + str(std_path), xy=(5, 11), horizontalalignment='left', verticalalignment='top', fontsize=15)
-plt.annotate(r'Failures: ' + str(by4_fail), xy=(5, 10.5), horizontalalignment='left', verticalalignment='top', fontsize=15)
+plt.annotate(r'$\bar{x}$: ' + str(np.round(np.mean(np.array(percent_error)), 3)), xy=(5, 38), horizontalalignment='left', verticalalignment='top', fontsize=15)
+plt.annotate(r'$\sigma$: ' + str(np.round(np.std(np.array(percent_error)), 3)), xy=(5, 36), horizontalalignment='left', verticalalignment='top', fontsize=15)
+plt.annotate(r'Non-Convergent Paths: ' + str(by4_fail), xy=(5, 34), horizontalalignment='left', verticalalignment='top', fontsize=15)
 plt.show()
