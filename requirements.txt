@@ -28,5 +28,4 @@ sympy==1.13.2
 threadpoolctl==3.5.0
 torch==2.4.0
 torchviz==0.0.2
-typing_extensions==4.12.2
 tzdata==2024.1
