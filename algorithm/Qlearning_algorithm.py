@@ -148,7 +148,7 @@ class DeepQ:
         # todo: made this action + 1, check this
         next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
-        reward = self.reward(next_state).unsqueeze(0)
+        reward = self.reward.forward(next_state).unsqueeze(0)
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)
@@ -203,7 +203,7 @@ class DeepQ:
 
         self.optimizer.zero_grad()
 
-        loss.backward(retain_graph=True)
+        loss.backward()
 
         # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
@@ -231,9 +231,10 @@ class DeepQ:
 
         for episode in range(self.num_epochs):
             path_indexer = 0
-            loc = None
             path_num = np.random.randint(len(self.expert_paths))
 
+            # pick a random place to start
+            loc = np.random.randint(624)
             for t in count():
 
                 # pick one of the threat fields and just rotate through as we continue training
@@ -246,9 +247,6 @@ class DeepQ:
                     action = np.where(possible_actions == action)[0][0]
                     path_indexer += 1
                 else:
-                    # pick a random place to start
-                    loc = np.random.randint(624)
-
                     # choose an action based on the starting location
                     action = self.select_action(loc, features=feature)
 
@@ -282,7 +280,8 @@ class DeepQ:
                 elif loc == 625:
                     log.debug(color='red', message='Exited the graph, total iterations: \t' + str(t))
                     break
-                elif t > 100:
+                elif t > 75:
+                    log.debug(message='Stayed in the graph, ran out of iterations')
                     break
 
             if episode % 50 == 0:

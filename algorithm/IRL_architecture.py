@@ -7,16 +7,23 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 
 
-class RewardFunction(nn.Module):
+class RewardFunction:
     """
     Assuming the reward function is a linear combination of the features
     R(s, a, s') = w^T * phi(s)
     """
 
-    def __init__(self, feature_dim):
-        super(RewardFunction, self).__init__()
+    def __init__(self, feature_dim, device):
         # initialize the weights as ones
-        self.weights = nn.Parameter(torch.zeros(feature_dim))
+        self.weights = torch.zeros(feature_dim)
+        self.device = device
+
+    def weight_update(self, new_weights):
+        # assuming input of a list (skikit-optimize uses lists for Bayesian optimization)
+        if len(new_weights) == len(self.weights):
+            self.weights = torch.tensor(new_weights, dtype=torch.float32).to(self.device)
+        else:
+            raise Exception("Incorrect reward function size specified")
 
     def forward(self, features):
         # return the anticipated reward function

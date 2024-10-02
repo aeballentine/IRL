@@ -16,10 +16,13 @@ numpy==2.1.1
 packaging==24.1
 pandas==2.2.2
 pillow==10.4.0
+pyaml==24.9.0
 pyparsing==3.1.4
 python-dateutil==2.9.0.post0
 pytz==2024.1
+PyYAML==6.0.2
 scikit-learn==1.5.2
+scikit-optimize==0.10.2
 scipy==1.14.1
 seaborn==0.13.2
 setuptools==74.1.1
@@ -28,4 +31,5 @@ sympy==1.13.2
 threadpoolctl==3.5.0
 torch==2.4.0
 torchviz==0.0.2
+typing_extensions==4.12.2
 tzdata==2024.1

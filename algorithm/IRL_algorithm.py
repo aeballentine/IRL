@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from skopt import gp_minimize
 
 from IRL_architecture import RewardFunction, CustomRewardDataset
 from IRL_utilities import neighbors_of_four
@@ -42,7 +43,7 @@ epochs = 1000  # number of epochs for the main training loop
 
 # value function
 q_tau = (
-    0.99  # rate at which to update the target_net variable inside the Q-learning module
+    0.9  # rate at which to update the target_net variable inside the Q-learning module
 )
 q_lr = 0.001  # learning rate for Q-learning
 q_criterion = (
@@ -79,7 +80,7 @@ log.info("The device is: " + str(device))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # constants for the network & initialize the reward model
-rewards = RewardFunction(feature_dim=feature_dims).to(device)
+rewards = RewardFunction(feature_dim=feature_dims, device=device)
 # criterion = nn.CrossEntropyLoss().to(device)   # weight=torch.tensor([2, 1.6, 0.2, 0.2,
                                                #         0.5, 0.4, 0.05, 0.05,
                                                #         0.5, 0.4, 0.05, 0.05,
@@ -95,10 +96,6 @@ dataset = CustomRewardDataset(feature_map=feature_function, expert_expectation=f
 dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)  # todo: changed this to false
 
 log.info("The dataloaders are created")
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# select the optimizer
-optimizer = torch.optim.Adam(rewards.parameters(), lr=learning_rate, amsgrad=True)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # set up the deep Q network
@@ -117,68 +114,89 @@ q_learning = DeepQ(
     batch_size=q_batch_size,
     criterion=q_criterion,
     path_length=path_length,
-    expert_paths = expert_paths
+    expert_paths=expert_paths
 )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # train the model
-rewards.train()
 log.info("Beginning training")
-losses_total = [np.inf]
-for epoch in range(epochs):
-    losses = []
-    for batch_num, input_data in enumerate(dataloader):
-        optimizer.zero_grad()
-        x, y = (
-            input_data  # x is the threat field and y is the expert average feature expectation
-        )
 
-        y = y.to(device).float()
 
-        log.info("Beginning Q-learning module")
-        q_learning.reward = rewards
-        output = q_learning.run_q_learning(features=x)
-        log.info("Q-learning completed")
+feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, 10)
+feature_averages = torch.from_numpy(feature_averages[0]).float().to(device)
 
-        loss = criterion(output, y)
-        log.info(message=output[:5])
-        log.info(message=y[:5])
-        log.debug(message=rewards.state_dict())
 
-        loss.requires_grad = True
-        loss.backward()
-        losses.append(loss.item())
-        losses_total.append(loss.item())
+def obj(x):
+    rewards.weight_update(x)
+    q_learning.reward = rewards
+    output = q_learning.run_q_learning(features=feature_function)
+    loss = criterion(output, feature_averages)
+    log.debug(
+        color="blue",
+        message="Current Performance: %6.4f" % (loss.item()),
+    )
+    return loss.item()
 
-        # can try this, but parameters look to be independent now
-        # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
 
-        optimizer.step()
-        log.debug(message=rewards.state_dict())
-
-        # # variable learning rate
-        # if loss.item() < 50:
-        #     new_rate = learning_rate / 100
-        # elif loss.item() < 10:
-        #     new_rate = learning_rate / 1000
-        # else:
-        #     new_rate = learning_rate
-        #
-        # # update the learning rate accordingly
-        # for g in optimizer.param_groups:
-        #     g['lr'] = new_rate
-
-        log.debug(
-            color="blue",
-            message="Epoch %d | Loss %6.4f" % (epoch, sum(losses) / len(losses)),
-        )
-
-log.info(message=rewards.state_dict())
-losses = np.array(losses_total)
-plt.plot(losses)
-plt.show()
+res = gp_minimize(obj,
+                  [(-30, 30), (-30, 30), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0)],
+                  n_calls=100, n_random_starts=20)
+print(res.x)
+print(res.fun)
+# losses_total = [np.inf]
+# for epoch in range(epochs):
+#     losses = []
+#     for batch_num, input_data in enumerate(dataloader):
+#         x, y = (
+#             input_data  # x is the threat field and y is the expert average feature expectation
+#         )
+#
+#         y = y.to(device).float()
+#
+#         log.info("Beginning Q-learning module")
+#         q_learning.reward = rewards
+#         output = q_learning.run_q_learning(features=x)
+#         log.info("Q-learning completed")
+#
+#         loss = criterion(output, y)
+#         log.info(message=output[:5])
+#         log.info(message=y[:5])
+#         log.debug(message=rewards.state_dict())
+#
+#         loss.requires_grad = True
+#         loss.backward()
+#         losses.append(loss.item())
+#         losses_total.append(loss.item())
+#
+#         # can try this, but parameters look to be independent now
+#         # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
+#
+#         optimizer.step()
+#         log.debug(message=rewards.state_dict())
+#
+#         # # variable learning rate
+#         # if loss.item() < 50:
+#         #     new_rate = learning_rate / 100
+#         # elif loss.item() < 10:
+#         #     new_rate = learning_rate / 1000
+#         # else:
+#         #     new_rate = learning_rate
+#         #
+#         # # update the learning rate accordingly
+#         # for g in optimizer.param_groups:
+#         #     g['lr'] = new_rate
+#
+#         log.debug(
+#             color="blue",
+#             message="Epoch %d | Loss %6.4f" % (epoch, sum(losses) / len(losses)),
+#         )
+#
+# log.info(message=rewards.state_dict())
+# losses = np.array(losses_total)
+# plt.plot(losses)
+# plt.show()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # save the model parameters
-torch.save(rewards, "results/reward_model_updated_two.pth")
-torch.save(q_learning.policy_net, "results/policy_model_updated_two.pth")
+# torch.save(rewards, "results/reward_model_updated_two.pth")
+# torch.save(q_learning.policy_net, "results/policy_model_updated_two.pth")

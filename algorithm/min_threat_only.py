@@ -214,7 +214,7 @@ class DeepQ:
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
-        loss.backward(retain_graph=True)
+        loss.backward()
 
         # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
