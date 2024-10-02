@@ -60,7 +60,7 @@ class DQN(nn.Module):
 class DeepQ:
     def __init__(
         self, n_observations, n_actions, device, LR, neighbors, gamma, target_loc, min_accuracy, memory_length, tau,
-            num_epochs, batch_size, criterion, path_length
+            num_epochs, batch_size, criterion, path_length, expert_paths
     ):
         # basic parameters
         self.n_observations = n_observations    # number of characteristics of the state
@@ -72,6 +72,7 @@ class DeepQ:
         self.tau = tau  # parameter to update the target network
         self.target_loc = target_loc    # target location
         self.path_length = path_length
+        self.expert_paths = expert_paths[0]
 
         self.loss = 0
 
@@ -201,9 +202,10 @@ class DeepQ:
         loss = self.criterion(state_action_values, expected_state_action_values)
 
         self.optimizer.zero_grad()
+
         loss.backward(retain_graph=True)
 
-        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
         return loss.item()
@@ -225,17 +227,31 @@ class DeepQ:
 
         self.steps_done = 0
         loss_memory = []
+        possible_actions = np.array([-1, 1, 25, -25])
 
         for episode in range(self.num_epochs):
+            path_indexer = 0
+            loc = None
+            path_num = np.random.randint(len(self.expert_paths))
+
             for t in count():
-                # pick a random place to start
-                loc = np.random.randint(624)
 
                 # pick one of the threat fields and just rotate through as we continue training
-                feature = features[episode % len(features)]
+                # feature = features[episode % len(features)]
+                feature = features[0]
 
-                # choose an action based on the starting location
-                action = self.select_action(loc, features=feature)
+                if (episode % 5 == 0) and episode < 100:
+                    loc = self.expert_paths[path_num][path_indexer]
+                    action = self.expert_paths[path_num][path_indexer + 1] - loc
+                    action = np.where(possible_actions == action)[0][0]
+                    path_indexer += 1
+                else:
+                    # pick a random place to start
+                    loc = np.random.randint(624)
+
+                    # choose an action based on the starting location
+                    action = self.select_action(loc, features=feature)
+
                 terminated, finished, next_state, reward, state, action, loc = (
                     self.find_next_state(loc=loc, action=action, features=feature)
                 )

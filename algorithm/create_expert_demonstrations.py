@@ -175,6 +175,7 @@ if __name__ == "__main__":
     features = []  # average feature expectation
     feature_map = []  # feature map for each point in the threat field
     threat_map = []  # need this to map paths for visualization
+    expert_paths = []
 
     for file in file_list[:1]:
         threat = pd.read_csv(file)  # all the data for the threat field
@@ -204,6 +205,7 @@ if __name__ == "__main__":
                 disp=False,
                 neighbor_coords=neighbors,
             )  # find the optimal path using the threat field and value function
+            expert_paths.append(np.array(path))
             path = path[:path_length]  # arbitrarily shorten the path
 
             # find the feature expectation of the path
@@ -225,6 +227,7 @@ if __name__ == "__main__":
         "expert_feat": features,
         "feature_map": feature_map,
         "threat_field": threat_map,
+        "expert_paths": [expert_paths],
     }
     expert_information = pd.DataFrame(expert_information)
     expert_information.to_pickle("expert_demonstrations/single_threat.pkl")

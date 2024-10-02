@@ -60,11 +60,12 @@ neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/multi_threat.pkl')
+data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
 
 feature_averages = data.expert_feat
 feature_function = data.feature_map
 threat_fields = data.threat_field
+expert_paths = data.expert_paths
 
 log.info("Expert feature average calculated")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -115,7 +116,8 @@ q_learning = DeepQ(
     num_epochs=q_epochs,
     batch_size=q_batch_size,
     criterion=q_criterion,
-    path_length=path_length
+    path_length=path_length,
+    expert_paths = expert_paths
 )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,8 +140,6 @@ for epoch in range(epochs):
         output = q_learning.run_q_learning(features=x)
         log.info("Q-learning completed")
 
-        print(output.shape)
-        print(y.shape)
         loss = criterion(output, y)
         log.info(message=output[:5])
         log.info(message=y[:5])
