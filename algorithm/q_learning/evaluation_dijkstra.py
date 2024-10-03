@@ -120,12 +120,12 @@ def find_nn_path(feature_function, starting_coord):
 
 if __name__ == "__main__":
     # neural network
-    policy_net = torch.load('policy_net_multi_threat.pth', weights_only=False)
+    policy_net = torch.load('policy_net_Bayesian_DONOT_delete.pth', weights_only=False)
     neighbors = neighbors_of_four(dims=(25, 25), target=624)
 
-    data = pd.read_pickle('multi_threat_dijkstra.pkl')
+    data = pd.read_pickle('single_threat_Bayesian.pkl')
     feature_function_ = data.feature_map
-    feature_function_ = np.reshape(feature_function_[42], (626, 10))
+    feature_function_ = np.reshape(feature_function_[0], (626, 10))
 
     # for Dijkstra's algorithm
     vertices = np.arange(0, 625, 1)
@@ -180,15 +180,15 @@ if __name__ == "__main__":
         # determine the cost of the neural network path and of Dijkstra's algorithm
         dijkstra_cost = 0
         for node in dijkstra_path[1:]:
-            dijkstra_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
-            # dijkstra_cost += threat_field_[node]
+            # dijkstra_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
+            dijkstra_cost += feature_function_[node][0]
             # if node == 624:
             #     dijkstra_cost += 10
 
         nn_cost = 0
         for node in nn_path[1:]:
-            nn_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
-            # nn_cost += threat_field_[node]
+            # nn_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
+            nn_cost += feature_function_[node][0]
             # if node == 624:
             #     nn_cost += 10
 
@@ -228,14 +228,14 @@ if __name__ == "__main__":
     plt.scatter(np.array(dijkstra_length), percent_error * 100, c='tab:blue', s=10)
     plt.xlabel('Optimal Path Length', fontdict={'size': 20})
     plt.ylabel(r'Percent Error - $J_{NN}$ and $J^*$', fontdict={'size': 20})
-    plt.ylim([-0.1, 30])
+    plt.ylim([-0.1, 100])
     plt.xlim([0, 50])
 
-    plt.annotate(r'$\bar{x}$: ' + str(mean), xy=(2, 29), horizontalalignment='left', verticalalignment='top',
+    plt.annotate(r'$\bar{x}$: ' + str(mean), xy=(2, 95), horizontalalignment='left', verticalalignment='top',
                  fontsize=15)
-    plt.annotate(r'$\sigma$: ' + str(std), xy=(2, 27), horizontalalignment='left', verticalalignment='top',
+    plt.annotate(r'$\sigma$: ' + str(std), xy=(2, 90), horizontalalignment='left', verticalalignment='top',
                  fontsize=15)
-    plt.annotate(r'Non-Convergent Paths: ' + str(n_failures), xy=(2, 25), horizontalalignment='left', verticalalignment='top',
+    plt.annotate(r'Non-Convergent Paths: ' + str(n_failures), xy=(2, 85), horizontalalignment='left', verticalalignment='top',
                  fontsize=15)
 
     plt.show()

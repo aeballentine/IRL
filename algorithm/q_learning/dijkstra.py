@@ -4,8 +4,8 @@ import heapq
 
 def edge_costs(feature_function, vertex):
     # print(feature_function)
-    return feature_function[vertex][0] + 2 * feature_function[vertex][1]
-    # return feature_function[vertex]
+    # return feature_function[vertex][0] + 2 * feature_function[vertex][1]
+    return feature_function[vertex][0]
 
 
 class Vertex:

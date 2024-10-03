@@ -69,7 +69,7 @@ class DeepQ:
 
     def __init__(
             self, n_observations, n_actions, device, LR, neighbors, gamma, target_loc, min_accuracy, memory_length, tau,
-            num_epochs, batch_size, criterion, path_length
+            num_epochs, batch_size, criterion, path_length, expert_paths
     ):
         # basic parameters
         self.n_observations = n_observations  # number of characteristics of the state
@@ -81,6 +81,7 @@ class DeepQ:
         self.tau = tau  # parameter to update the target network
         self.target_loc = target_loc  # target location
         self.path_length = path_length
+        self.expert_paths = expert_paths[0]
 
         self.loss = 0
 
@@ -118,7 +119,7 @@ class DeepQ:
         self.nn_calc = None
 
     def select_action(self, loc, features):
-        state = features[0, loc]  # features is a (1, 626, 5) vector, so choose the row corresponding to the loc
+        state = features[loc]  # features is a (1, 626, 5) vector, so choose the row corresponding to the loc
         sample = random.random()  # random number generator
         eps_threshold = self.EPS_END + (self.EPS_START - self.EPS_END) * math.exp(
             -1 * self.steps_done / self.EPS_DECAY
@@ -151,8 +152,12 @@ class DeepQ:
         # R(s, a, s') = 4 * (10 - c(s') - b)
         # where b is 1 if not at the goal and 0 at the goal state
         # reward = 5 * (10 - next_state[0].unsqueeze(0).to(self.device))
-        reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
+        # reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
         # - 2 * next_state[1])  # reward associated with the next state
+        reward = (
+                12 * next_state[0] - 4 * next_state[1] - 30 * next_state[2] - 2 * next_state[3] - 13 * next_state[4]
+                - 21 * next_state[5] - 7 * next_state[6] - 27 * next_state[7] - next_state[8] - 17 * next_state[9]
+        ).unsqueeze(0)
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)
@@ -162,7 +167,7 @@ class DeepQ:
             terminated = False
             finished = True
             next_state = next_state.unsqueeze(0)
-            reward += 100   # cost is zero at the destination
+            # reward += 100   # cost is zero at the destination
 
         elif next_loc == 625:
             terminated = True
@@ -224,6 +229,9 @@ class DeepQ:
         self.steps_done = 0
         # loss_memory = []
         num_features = len(features)
+        possible_actions = np.array([-1, 1, 25, -25])
+
+        cumulative_loss = []
 
         for episode in range(self.num_epochs):
             # hard update
@@ -237,24 +245,29 @@ class DeepQ:
             feature_ind = np.random.randint(num_features)
             feature = features[feature_ind]
 
+            path_indexer = 0
+            path_num = np.random.randint(len(self.expert_paths))
+
             loss_memory = []
             for t in count():
                 # pick a random place to start
                 # feature = features[0]
 
-                # random sampling from an "expert" path
-                # if (t % 5 == 0) and (episode < 100):
-                #     if self.neighbors.iloc[loc, 3] != 625:
-                #         action = 2
-                #     else:
-                #         action = 1
-                # else:
-                #     # choose an action based on the starting location
-                action = self.select_action(loc, features=features)
+                if (episode % 2 == 0) and episode < 100:
+                    loc = self.expert_paths[path_num][path_indexer]
+                    action = self.expert_paths[path_num][path_indexer + 1] - loc
+                    action = np.where(possible_actions == action)[0][0]
+                    path_indexer += 1
+                else:
+                    # choose an action based on the starting location
+                    action = self.select_action(loc, features=feature)
 
                 terminated, finished, next_state, reward, state, action, loc = (
                     self.find_next_state(loc=loc, action=action, features=feature)
                 )
+
+                # if loc in path_history:
+                #     next_state = None
 
                 # add the action to memory
                 self.memory.push(state, action, next_state, reward)
@@ -266,9 +279,8 @@ class DeepQ:
                 # target_net_state_dict = self.target_net.state_dict()
                 # policy_net_state_dict = self.policy_net.state_dict()
                 # for key in policy_net_state_dict:
-                #     target_net_state_dict[key] = policy_net_state_dict[
-                #                                      key
-                #                                  ] * self.tau + target_net_state_dict[key] * (1 - self.tau)
+                #     target_net_state_dict[key] = (policy_net_state_dict[key] * self.tau +
+                #                                   target_net_state_dict[key] * (1 - self.tau))
                 # self.target_net.load_state_dict(target_net_state_dict)
 
                 # if not loss:
@@ -277,6 +289,7 @@ class DeepQ:
                 #     pass
 
                 loss_memory.append(loss)
+                cumulative_loss.append(loss)
 
                 if loc == 624:
                     log.debug(color='blue', message='Found finish, total iterations: \t' + str(t))
@@ -284,8 +297,10 @@ class DeepQ:
                 elif loc == 625:
                     log.debug(color='red', message='Exited the graph, total iterations: \t' + str(t))
                     break
-                elif t > 100:
+                elif t > 75:
                     break
+                # elif loc in path_history:
+                #     break
 
             log.info(
                 "Epoch: \t"
@@ -304,8 +319,11 @@ class DeepQ:
 
         log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
+
+        # plot the loss over time
+        plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_target_14.pth')
+        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_DONOT_delete.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):
@@ -440,7 +458,7 @@ if __name__ == "__main__":
 
     # MACHINE LEARNING PARAMETERS
     q_tau = (
-        0.0001  # rate at which to update the target_net variable inside the Q-learning module
+        0.001  # rate at which to update the target_net variable inside the Q-learning module
     )
     q_lr = 0.01  # learning rate
     q_criterion = (
@@ -448,8 +466,8 @@ if __name__ == "__main__":
     )  # criterion to determine the loss during training (otherwise try hinge embedding)
     q_batch_size = 500  # batch size
     q_features = 10  # number of features to take into consideration
-    q_epochs = 1000  # number of epochs to iterate through for Q-learning
-    q_accuracy = 1e-3  # value to terminate Q-learning (if value is better than this)
+    q_epochs = 550  # number of epochs to iterate through for Q-learning
+    q_accuracy = 10  # value to terminate Q-learning (if value is better than this)
     q_memory = 500
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -458,9 +476,10 @@ if __name__ == "__main__":
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # LOAD THE DATA
-    data = pd.read_pickle('expert_demonstrations/multi_threat.pkl')
+    data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
     feature_function_ = data.feature_map.to_numpy()
     feature_function_ = np.concatenate(feature_function_)
+    expert_paths_ = data.expert_paths
 
     log.info("Expert feature average calculated")
 
@@ -484,11 +503,12 @@ if __name__ == "__main__":
         num_epochs=q_epochs,
         batch_size=q_batch_size,
         criterion=q_criterion,
-        path_length=path_length_
+        path_length=path_length_,
+        expert_paths=expert_paths_,
     )
 
     torch.set_printoptions(linewidth=200)
-    feature_function_ = torch.from_numpy(feature_function_).view(-1, 626, q_features).float().abs()
+    feature_function_ = torch.from_numpy(feature_function_).view(1, 626, q_features).float().abs()
     # feature_function_ = np.reshape(feature_function_, (-1, 626, q_features))
     # feature_function = np.abs(feature_function_)
     # print(feature_function)
