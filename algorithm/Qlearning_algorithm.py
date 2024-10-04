@@ -13,6 +13,7 @@ from itertools import count
 import torch
 from torch import nn
 from torch import optim
+from torch.nn import functional as func
 
 from IRL_utilities import MyLogger
 
@@ -148,7 +149,8 @@ class DeepQ:
         # todo: made this action + 1, check this
         next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
-        reward = self.reward.forward(next_state[:4]).unsqueeze(0)
+        with torch.no_grad():
+            reward = self.reward(next_state[:4]).unsqueeze(0)
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)
@@ -212,7 +214,7 @@ class DeepQ:
 
     def run_q_learning(self, features):
         # input features (a nx626x20 vector: first dimension indicates the number of threat fields used for training)
-        if self.loss > 1:     # if the prior q-learning loop didn't perform well, re-generate random weights
+        if self.loss > 5:     # if the prior q-learning loop didn't perform well, re-generate random weights
             self.policy_net = DQN(
                 n_observations=self.n_observations, n_actions=self.n_actions
             ).to(self.device)
