@@ -45,7 +45,7 @@ epochs = 1000  # number of epochs for the main training loop
 q_tau = (
     0.9  # rate at which to update the target_net variable inside the Q-learning module
 )
-q_lr = 0.01  # learning rate for Q-learning
+q_lr = 0.001  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
@@ -139,7 +139,7 @@ def obj(x):
 
 
 res = gp_minimize(obj,
-                  [(-30, 30), (-30, 30), (-30, 30), (-30, 30)],
+                  [(-10, 10), (-10, 10), (-10, 10), (-10, 10)],
                   n_calls=100, n_random_starts=20)
 print(res.x)
 print(res.fun)

@@ -275,13 +275,16 @@ class DeepQ:
                     loss = loss
 
                 if loc == 624:
-                    log.debug(color='blue', message='Found finish, total iterations: \t' + str(t))
+                    log.debug(color='blue', message='Found finish, total iterations: \t \t \t' + str(t) +
+                                                    '\t final loss: \t' + str(np.round(loss, 2)))
                     break
                 elif loc == 625:
-                    log.debug(color='red', message='Exited the graph, total iterations: \t' + str(t))
+                    log.debug(color='red', message='Exited the graph, total iterations: \t \t' + str(t) +
+                                                   '\t final loss: \t' + str(np.round(loss, 2)))
                     break
                 elif t > 75:
-                    log.debug(message='Stayed in the graph, ran out of iterations')
+                    log.debug(message='Stayed in the graph, ran out of iterations' + '\t final loss: \t' +
+                                      str(np.round(loss, 2)))
                     break
 
             if episode % 50 == 0:
