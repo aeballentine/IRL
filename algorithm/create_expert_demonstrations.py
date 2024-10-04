@@ -112,19 +112,19 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     max_distance = max(distance)[0]  # because the distance decreases toward the final destination
     high_gradx = max(grad_x)
     high_grady = max(grad_y)
-    outside_cell = np.array([[high_threat, max_distance,  # high_gradx, high_grady,
-                              high_threat, max_distance,  # high_gradx, high_grady,
-                              high_threat, max_distance,  # high_gradx, high_grady,
-                              high_threat, max_distance,  # high_gradx, high_grady,
-                              high_threat, max_distance, ]])  # high_gradx, high_grady,]])
+    outside_cell = np.array([[high_threat, max_distance,  high_gradx, high_grady,
+                              high_threat, max_distance,  high_gradx, high_grady,
+                              high_threat, max_distance,  high_gradx, high_grady,
+                              high_threat, max_distance,  high_gradx, high_grady,
+                              high_threat, max_distance, high_gradx, high_grady,]])
 
     # want to group by cell, not by value type to make calling the reward function easier
     feature_func = np.concatenate(
-        (my_threat, distance,  # my_gradx, my_grady,
-         left_vals, left_dist,  # left_gradx, left_grady,
-         right_vals, right_dist,  # right_gradx, right_grady,
-         up_vals, up_dist,  # up_gradx, up_grady,
-         down_vals, down_dist,), axis=1  # down_gradx, down_grady), axis=1
+        (my_threat, distance, my_gradx, my_grady,
+         left_vals, left_dist, left_gradx, left_grady,
+         right_vals, right_dist, right_gradx, right_grady,
+         up_vals, up_dist, up_gradx, up_grady,
+         down_vals, down_dist, down_gradx, down_grady), axis=1
     )
     return np.concatenate((feature_func, outside_cell), axis=0)
 

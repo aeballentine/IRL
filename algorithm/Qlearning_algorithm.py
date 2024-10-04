@@ -148,7 +148,7 @@ class DeepQ:
         # todo: made this action + 1, check this
         next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
-        reward = self.reward.forward(next_state).unsqueeze(0)
+        reward = self.reward.forward(next_state[:4]).unsqueeze(0)
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)

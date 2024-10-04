@@ -32,7 +32,7 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    10  # number of features to take into account (for the reward function)
+    4  # number of features to take into account (for the reward function)
 )
 
 # MACHINE LEARNING PARAMETERS
@@ -45,15 +45,15 @@ epochs = 1000  # number of epochs for the main training loop
 q_tau = (
     0.9  # rate at which to update the target_net variable inside the Q-learning module
 )
-q_lr = 0.001  # learning rate for Q-learning
+q_lr = 0.01  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
-q_batch_size = 400  # batch size
-q_features = 10  # number of features to take into consideration
-q_epochs = 500  # number of epochs to iterate through for Q-learning
+q_batch_size = 500  # batch size
+q_features = 20  # number of features to take into consideration
+q_epochs = 550  # number of epochs to iterate through for Q-learning
 q_accuracy = 0.001  # value to terminate Q-learning (if value is better than this)
-q_memory = 1000     # memory length for Q-learning
+q_memory = 500     # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -122,7 +122,7 @@ q_learning = DeepQ(
 log.info("Beginning training")
 
 
-feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, 10)
+feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, q_features)
 feature_averages = torch.from_numpy(feature_averages[0]).float().to(device)
 
 
@@ -139,7 +139,7 @@ def obj(x):
 
 
 res = gp_minimize(obj,
-                  [(-30, 30), (-30, 30), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0), (-30, 0)],
+                  [(-30, 30), (-30, 30), (-30, 30), (-30, 30)],
                   n_calls=100, n_random_starts=20)
 print(res.x)
 print(res.fun)
