@@ -155,7 +155,7 @@ class DeepQ:
         # reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
         # - 2 * next_state[1])  # reward associated with the next state
         reward = (
-                -4 * next_state[0] - 5 * next_state[1] - 7 * next_state[2] + 2 * next_state[3]
+                -30 * next_state[0] - 16 * next_state[1] + 27 * next_state[2] - 30 * next_state[3]
         ).unsqueeze(0)
 
         # formatting
@@ -322,7 +322,7 @@ class DeepQ:
         # plot the loss over time
         plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_2.pth')
+        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_3.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):
@@ -459,7 +459,7 @@ if __name__ == "__main__":
     q_tau = (
         0.9  # rate at which to update the target_net variable inside the Q-learning module
     )
-    q_lr = 0.001  # learning rate
+    q_lr = 0.0001  # learning rate
     q_criterion = (
         nn.HuberLoss()
     )  # criterion to determine the loss during training (otherwise try hinge embedding)

@@ -120,7 +120,12 @@ def find_nn_path(feature_function, starting_coord):
 
 if __name__ == "__main__":
     # neural network
-    policy_net = torch.load('policy_net_Bayesian_2.pth', weights_only=False)
+    device = torch.device(
+        "cuda" if torch.cuda.is_available() else
+        "mps" if torch.backends.mps.is_available() else
+        "cpu"
+    )
+    policy_net = torch.load('policy_net_Bayesian_3.pth', weights_only=False, map_location=device)
     neighbors = neighbors_of_four(dims=(25, 25), target=624)
 
     data = pd.read_pickle('single_threat_Bayesian_2.pkl')
@@ -153,7 +158,7 @@ if __name__ == "__main__":
     for coord in starting_coords:
         # call dijsktras and the nn
         nn_path, info, outside, fail_loc, fail_val = find_nn_path(
-            feature_function=torch.from_numpy(feature_function_).float().abs(),
+            feature_function=torch.from_numpy(feature_function_).float(),
             starting_coord=int(coord))
         dijkstra_info, counter = dijkstra(feature_function=feature_function_, vertices=vertices, source=int(coord),
                                           node_f=624, neighbors=neighbors)
@@ -229,13 +234,14 @@ if __name__ == "__main__":
     plt.xlabel('Optimal Path Length', fontdict={'size': 20})
     plt.ylabel(r'Percent Error - $J_{NN}$ and $J^*$', fontdict={'size': 20})
     plt.ylim([-0.1, 100])
-    plt.xlim([0, 50])
+    plt.xlim([0, 60])
 
     plt.annotate(r'$\bar{x}$: ' + str(mean), xy=(2, 95), horizontalalignment='left', verticalalignment='top',
                  fontsize=15)
     plt.annotate(r'$\sigma$: ' + str(std), xy=(2, 90), horizontalalignment='left', verticalalignment='top',
                  fontsize=15)
-    plt.annotate(r'Non-Convergent Paths: ' + str(n_failures), xy=(2, 85), horizontalalignment='left', verticalalignment='top',
+    plt.annotate(r'Non-Convergent Paths: ' + str(n_failures), xy=(2, 85), horizontalalignment='left',
+                 verticalalignment='top',
                  fontsize=15)
 
     plt.show()
