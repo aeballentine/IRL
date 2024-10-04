@@ -61,7 +61,7 @@ neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
+data = pd.read_pickle('expert_demonstrations/single_threat_long_path.pkl')
 
 feature_averages = data.expert_feat
 feature_function = data.feature_map
@@ -123,7 +123,7 @@ log.info("Beginning training")
 
 
 feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, q_features)
-feature_averages = torch.from_numpy(feature_averages[0]).float().to(device)
+feature_averages = torch.from_numpy(feature_averages[0]).float().to(device).view(1, 1250, q_features)
 
 
 def obj(x):

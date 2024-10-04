@@ -157,7 +157,7 @@ if __name__ == "__main__":
                        111, 504, 393, 588, 83, 27, 250]
     end_index = 624  # index of the final location
 
-    path_length = 10  # maximum number of points to keep
+    path_length = 50  # maximum number of points to keep
     gamma = 1  # discount factor
 
     # neighbors dataframe: this records all the neighbors of four
@@ -230,6 +230,6 @@ if __name__ == "__main__":
         "expert_paths": [expert_paths],
     }
     expert_information = pd.DataFrame(expert_information)
-    expert_information.to_pickle("expert_demonstrations/single_threat.pkl")
+    expert_information.to_pickle("expert_demonstrations/single_threat_long_path.pkl")
 
     # print(', '.join(map(lambda x: str(x), starting_coords)))
