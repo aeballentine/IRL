@@ -26,8 +26,8 @@ torch.set_printoptions(linewidth=800)
 # DATA PARAMETERS
 # threat field
 target_loc = 624  # final location in the threat field
-gamma = 0.8  # discount factor
-path_length = 10  # maximum number of points to keep along expert generated paths
+gamma = 0.9  # discount factor
+path_length = 50  # maximum number of points to keep along expert generated paths
 dims = (25, 25)
 
 # feature dimensions
