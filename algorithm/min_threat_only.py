@@ -155,8 +155,7 @@ class DeepQ:
         # reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
         # - 2 * next_state[1])  # reward associated with the next state
         reward = (
-                12 * next_state[0] - 4 * next_state[1] - 30 * next_state[2] - 2 * next_state[3] - 13 * next_state[4]
-                - 21 * next_state[5] - 7 * next_state[6] - 27 * next_state[7] - next_state[8] - 17 * next_state[9]
+                -4 * next_state[0] - 5 * next_state[1] - 7 * next_state[2] + 2 * next_state[3]
         ).unsqueeze(0)
 
         # formatting
@@ -323,7 +322,7 @@ class DeepQ:
         # plot the loss over time
         plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_DONOT_delete.pth')
+        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_2.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):
@@ -453,21 +452,21 @@ if __name__ == "__main__":
     # threat field
     target_loc_ = 624  # final location in the threat field
     gamma_ = 1  # discount factor
-    path_length_ = 30  # maximum number of points to keep along expert generated paths
+    path_length_ = 50  # maximum number of points to keep along expert generated paths
     dims = (25, 25)
 
     # MACHINE LEARNING PARAMETERS
     q_tau = (
-        0.001  # rate at which to update the target_net variable inside the Q-learning module
+        0.9  # rate at which to update the target_net variable inside the Q-learning module
     )
-    q_lr = 0.01  # learning rate
+    q_lr = 0.001  # learning rate
     q_criterion = (
         nn.HuberLoss()
     )  # criterion to determine the loss during training (otherwise try hinge embedding)
     q_batch_size = 500  # batch size
-    q_features = 10  # number of features to take into consideration
+    q_features = 20  # number of features to take into consideration
     q_epochs = 550  # number of epochs to iterate through for Q-learning
-    q_accuracy = 10  # value to terminate Q-learning (if value is better than this)
+    q_accuracy = 1  # value to terminate Q-learning (if value is better than this)
     q_memory = 500
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -508,7 +507,7 @@ if __name__ == "__main__":
     )
 
     torch.set_printoptions(linewidth=200)
-    feature_function_ = torch.from_numpy(feature_function_).view(1, 626, q_features).float().abs()
+    feature_function_ = torch.from_numpy(feature_function_).view(1, 626, q_features).float()
     # feature_function_ = np.reshape(feature_function_, (-1, 626, q_features))
     # feature_function = np.abs(feature_function_)
     # print(feature_function)

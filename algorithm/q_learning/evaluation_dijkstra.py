@@ -2,11 +2,11 @@ import torch
 from torch import nn
 import numpy as np
 import pandas as pd
-from torchviz import make_dot
+# from torchviz import make_dot
 import torch.nn.functional as func
 import matplotlib.pyplot as plt
 import matplotlib
-import seaborn as sns
+# import seaborn as sns
 
 from dijkstra import dijkstra
 from IRL_utilities import neighbors_of_four
@@ -80,7 +80,7 @@ def find_nn_path(feature_function, starting_coord):
         "mps" if torch.backends.mps.is_available() else
         "cpu"
     )
-    feature_function = feature_function.view(-1, 10)
+    feature_function = feature_function.view(-1, 20)
     new_coord = starting_coord
     new_feat = feature_function[new_coord].to(device)
     path = [new_coord]
@@ -120,12 +120,12 @@ def find_nn_path(feature_function, starting_coord):
 
 if __name__ == "__main__":
     # neural network
-    policy_net = torch.load('policy_net_Bayesian_DONOT_delete.pth', weights_only=False)
+    policy_net = torch.load('policy_net_Bayesian_2.pth', weights_only=False)
     neighbors = neighbors_of_four(dims=(25, 25), target=624)
 
-    data = pd.read_pickle('single_threat_Bayesian.pkl')
+    data = pd.read_pickle('single_threat_Bayesian_2.pkl')
     feature_function_ = data.feature_map
-    feature_function_ = np.reshape(feature_function_[0], (626, 10))
+    feature_function_ = np.reshape(feature_function_[0], (626, 20))
 
     # for Dijkstra's algorithm
     vertices = np.arange(0, 625, 1)
