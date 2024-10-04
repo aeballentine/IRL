@@ -52,7 +52,7 @@ q_criterion = (
 q_batch_size = 500  # batch size
 q_features = 20  # number of features to take into consideration
 q_epochs = 550  # number of epochs to iterate through for Q-learning
-q_accuracy = 0.001  # value to terminate Q-learning (if value is better than this)
+q_accuracy = 0.1  # value to terminate Q-learning (if value is better than this)
 q_memory = 500     # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
