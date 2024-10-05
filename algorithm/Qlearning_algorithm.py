@@ -314,7 +314,7 @@ class DeepQ:
         # tile the starting coordinates
         coords = np.tile(self.starting_coords[5:], n_threats)
         # make a "conversion" vector: this allows us to access the 2nd and 3rd (and so on) feature functions
-        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
+        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords) - 5)
         # 626 because we've added a 626th row to the feature function for outside the boundary
 
         # starting features

@@ -137,6 +137,7 @@ log.info("Beginning training")
 
 losses_total = [np.inf]
 best_loss = np.inf
+best_reward = None
 for epoch in range(epochs):
     losses = []
     for batch_num, input_data in enumerate(dataloader):
@@ -174,6 +175,8 @@ for epoch in range(epochs):
             torch.save(rewards, "results/reward_best_model_sample_diff.pth")
             torch.save(q_learning.policy_net, "results/policy_model_best_sample_diff.pth")
             best_loss = loss.item()
+            best_reward = rewards.state_dict()
+
 #
 #         # # variable learning rate
 #         # if loss.item() < 50:
@@ -202,3 +205,4 @@ plt.show()
 torch.save(rewards, "results/reward_model_final_sample_diff.pth")
 torch.save(q_learning.policy_net, "results/policy_model_final_sample_diff.pth")
 log.debug("Best loss: \t" + str(best_loss))
+log.debug(rewards.state_dict())
