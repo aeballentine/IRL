@@ -155,7 +155,7 @@ class DeepQ:
         # reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
         # - 2 * next_state[1])  # reward associated with the next state
         reward = (
-                -30 * next_state[0] - 16 * next_state[1] + 27 * next_state[2] - 30 * next_state[3]
+                -2.6771 * next_state[0] - 3.5723 * next_state[1] - 5.5519 * next_state[2] + 2.933 * next_state[3]
         ).unsqueeze(0)
 
         # formatting
@@ -322,7 +322,7 @@ class DeepQ:
         # plot the loss over time
         plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_3.pth')
+        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_tuned.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):

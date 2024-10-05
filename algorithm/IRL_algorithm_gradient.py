@@ -61,12 +61,12 @@ neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/single_threat_long_path.pkl')
+data = pd.read_pickle('expert_demonstrations/single_threat_sample_paths.pkl')
 
 feature_averages = data.expert_feat
 feature_function = data.feature_map
 threat_fields = data.threat_field
-expert_paths = data.expert_paths
+expert_paths = data.sample_paths
 
 log.info("Expert feature average calculated")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,6 +136,7 @@ q_learning = DeepQ(
 log.info("Beginning training")
 
 losses_total = [np.inf]
+best_loss = np.inf
 for epoch in range(epochs):
     losses = []
     for batch_num, input_data in enumerate(dataloader):
@@ -168,6 +169,11 @@ for epoch in range(epochs):
 #
         optimizer.step()
         log.debug(message=rewards.state_dict())
+
+        if loss.item() < best_loss:
+            torch.save(rewards, "results/reward_best_model_sample_diff.pth")
+            torch.save(q_learning.policy_net, "results/policy_model_best_sample_diff.pth")
+            best_loss = loss.item()
 #
 #         # # variable learning rate
 #         # if loss.item() < 50:
@@ -187,11 +193,12 @@ for epoch in range(epochs):
 #         )
 #
 # log.info(message=rewards.state_dict())
-# losses = np.array(losses_total)
-# plt.plot(losses)
-# plt.show()
+losses = np.array(losses_total)
+plt.plot(losses)
+plt.show()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # save the model parameters
-# torch.save(rewards, "results/reward_model_updated_two.pth")
-# torch.save(q_learning.policy_net, "results/policy_model_updated_two.pth")
+torch.save(rewards, "results/reward_model_final_sample_diff.pth")
+torch.save(q_learning.policy_net, "results/policy_model_final_sample_diff.pth")
+log.debug("Best loss: \t" + str(best_loss))

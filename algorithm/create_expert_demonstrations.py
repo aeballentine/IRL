@@ -175,7 +175,7 @@ if __name__ == "__main__":
     features = []  # average feature expectation
     feature_map = []  # feature map for each point in the threat field
     threat_map = []  # need this to map paths for visualization
-    expert_paths = []
+    training_paths = []
 
     for file in file_list[:1]:
         threat = pd.read_csv(file)  # all the data for the threat field
@@ -196,7 +196,7 @@ if __name__ == "__main__":
         feature_map.append(my_feature_map)
         my_features = []
 
-        for loc in starting_coords:
+        for loc in starting_coords[5:]:
             path, status = find_optimal_path(
                 value_func=value_function,
                 threat_map=threat_field,
@@ -205,31 +205,42 @@ if __name__ == "__main__":
                 disp=False,
                 neighbor_coords=neighbors,
             )  # find the optimal path using the threat field and value function
-            expert_paths.append(np.array(path))
             path = path[:path_length]  # arbitrarily shorten the path
 
             # find the feature expectation of the path
             my_features.append(find_feature_expectation(
                 coords=path, feature_function=my_feature_map, discount=gamma
             ))
+        for loc in starting_coords[:5]:
+            path, status = find_optimal_path(
+                value_func=value_function,
+                threat_map=threat_field,
+                start_index=loc,
+                destination=end_index,
+                disp=False,
+                neighbor_coords=neighbors,
+            )  # find the optimal path using the threat field and value function
+            training_paths.append(np.array(path))
 
-            if not status:
-                # print("FAILED")
-                failures += 1
+            # if not status:
+            #     # print("FAILED")
+            #     failures += 1
 
         # my_features /= len(starting_coords)
         my_features = np.concatenate(my_features, axis=0)
         features.append(my_features)
-    print(failures)  # NOTE: not sure why these are failures: there are very small discrepancies
+    # print(failures)  # NOTE: not sure why these are failures: there are very small discrepancies
 
     # save to a pkl file
     expert_information = {
         "expert_feat": features,
         "feature_map": feature_map,
         "threat_field": threat_map,
-        "expert_paths": [expert_paths],
+        "sample_paths": [training_paths],
+
+
     }
     expert_information = pd.DataFrame(expert_information)
-    expert_information.to_pickle("expert_demonstrations/single_threat_long_path.pkl")
+    expert_information.to_pickle("expert_demonstrations/single_threat_sample_paths.pkl")
 
     # print(', '.join(map(lambda x: str(x), starting_coords)))
