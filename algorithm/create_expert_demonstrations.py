@@ -238,7 +238,7 @@ if __name__ == "__main__":
         "feature_map": feature_map,
         "threat_field": threat_map,
         "sample_paths": [training_paths],
-        'test_points': [starting_coords[:10]]
+        'test_points': [starting_coords[10:]]
 
 
     }

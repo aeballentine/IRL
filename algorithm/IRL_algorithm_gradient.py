@@ -45,13 +45,13 @@ epochs = 1000  # number of epochs for the main training loop
 q_tau = (
     0.9  # rate at which to update the target_net variable inside the Q-learning module
 )
-q_lr = 0.001  # learning rate for Q-learning
+q_lr = 0.0001  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 500  # batch size
 q_features = 20  # number of features to take into consideration
-q_epochs = 550  # number of epochs to iterate through for Q-learning
+q_epochs = 600  # number of epochs to iterate through for Q-learning
 q_accuracy = 4  # value to terminate Q-learning (if value is better than this)
 q_memory = 500     # memory length for Q-learning
 
