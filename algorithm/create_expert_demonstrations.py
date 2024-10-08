@@ -153,8 +153,9 @@ if __name__ == "__main__":
     # parameters of the threat field
     dims = (25, 25)  # dimension of the threat field
     # starting_coords = np.random.randint(0, 623, size=25)  # random points for path planning
-    starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
-                       111, 504, 393, 588, 83, 27, 250]
+    # starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
+    #                    111, 504, 393, 588, 83, 27, 250]
+    starting_coords = np.random.randint(0, 624, 100)
     end_index = 624  # index of the final location
 
     path_length = 50  # maximum number of points to keep
@@ -196,7 +197,7 @@ if __name__ == "__main__":
         feature_map.append(my_feature_map)
         my_features = []
 
-        for loc in starting_coords[5:]:
+        for loc in starting_coords[10:]:
             path, status = find_optimal_path(
                 value_func=value_function,
                 threat_map=threat_field,
@@ -211,7 +212,7 @@ if __name__ == "__main__":
             my_features.append(find_feature_expectation(
                 coords=path, feature_function=my_feature_map, discount=gamma
             ))
-        for loc in starting_coords[:5]:
+        for loc in starting_coords[:10]:
             path, status = find_optimal_path(
                 value_func=value_function,
                 threat_map=threat_field,
@@ -237,6 +238,7 @@ if __name__ == "__main__":
         "feature_map": feature_map,
         "threat_field": threat_map,
         "sample_paths": [training_paths],
+        'test_points': [starting_coords[:10]]
 
 
     }

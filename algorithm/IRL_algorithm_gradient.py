@@ -67,6 +67,7 @@ feature_averages = data.expert_feat
 feature_function = data.feature_map
 threat_fields = data.threat_field
 expert_paths = data.sample_paths
+test_points = data.test_points[0]
 
 log.info("Expert feature average calculated")
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -128,7 +129,8 @@ q_learning = DeepQ(
     batch_size=q_batch_size,
     criterion=q_criterion,
     path_length=path_length,
-    expert_paths=expert_paths
+    expert_paths=expert_paths,
+    starting_coords=test_points,
 )
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -172,8 +174,8 @@ for epoch in range(epochs):
         log.debug(message=rewards.state_dict())
 
         if loss.item() < best_loss:
-            torch.save(rewards, "results/reward_best_model_sample_diff.pth")
-            torch.save(q_learning.policy_net, "results/policy_model_best_sample_diff.pth")
+            torch.save(rewards, "results/reward_best_model_more_samples.pth")
+            torch.save(q_learning.policy_net, "results/policy_model_best_more_samples.pth")
             best_loss = loss.item()
             best_reward = rewards.state_dict()
 
@@ -202,7 +204,7 @@ plt.show()
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # save the model parameters
-torch.save(rewards, "results/reward_model_final_sample_diff.pth")
-torch.save(q_learning.policy_net, "results/policy_model_final_sample_diff.pth")
+torch.save(rewards, "results/reward_model_final_more_samples.pth")
+torch.save(q_learning.policy_net, "results/policy_model_final_more_samples.pth")
 log.debug("Best loss: \t" + str(best_loss))
 log.debug(rewards.state_dict())

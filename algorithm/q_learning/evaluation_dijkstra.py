@@ -125,7 +125,7 @@ if __name__ == "__main__":
         "mps" if torch.backends.mps.is_available() else
         "cpu"
     )
-    policy_net = torch.load('policy_net_Bayesian_tuned.pth', weights_only=False, map_location=device)
+    policy_net = torch.load('policy_model_final_sample_diff.pth', weights_only=False, map_location=device)
     neighbors = neighbors_of_four(dims=(25, 25), target=624)
 
     data = pd.read_pickle('single_threat_Bayesian_2.pkl')

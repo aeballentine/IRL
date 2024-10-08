@@ -61,7 +61,7 @@ class DQN(nn.Module):
 class DeepQ:
     def __init__(
         self, n_observations, n_actions, device, LR, neighbors, gamma, target_loc, min_accuracy, memory_length, tau,
-            num_epochs, batch_size, criterion, path_length, expert_paths, starting_coords
+            num_epochs, batch_size, criterion, path_length, expert_paths
     ):
         # basic parameters
         self.n_observations = n_observations    # number of characteristics of the state
@@ -109,9 +109,8 @@ class DeepQ:
         self.gamma = gamma  # discount factor
 
         # coords to calculate the feature expectation
-        # self.starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
-        #                         111, 504, 393, 588, 83, 27, 250]
-        self.starting_coords = starting_coords
+        self.starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
+                                111, 504, 393, 588, 83, 27, 250]
 
     def select_action(self, loc, features):
         # input: loc (1d coordinate) and features (feature vector, 626x20)
