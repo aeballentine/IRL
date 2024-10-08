@@ -244,7 +244,7 @@ class DeepQ:
                 # feature = features[episode % len(features)]
                 feature = features[0]
 
-                if (episode % 5 == 0) and episode < 100:
+                if (episode % 10 == 0) and episode < 100:
                     loc = self.expert_paths[path_num][path_indexer]
                     action = self.expert_paths[path_num][path_indexer + 1] - loc
                     action = np.where(possible_actions == action)[0][0]
