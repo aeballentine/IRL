@@ -98,9 +98,9 @@ class DeepQ:
 
         # epsilon parameters
         self.steps_done = 0     # to track for decay
-        self.EPS_START = 0.91    # starting value
+        self.EPS_START = 0.85    # starting value
         self.EPS_END = 0.051    # lowest possible value
-        self.EPS_DECAY = 1000  # this was originally 1000
+        self.EPS_DECAY = 500  # this was originally 1000
 
         # for movement tracking
         self.neighbors = neighbors  # dataframe of neighbors
@@ -244,14 +244,14 @@ class DeepQ:
                 # feature = features[episode % len(features)]
                 feature = features[0]
 
-                # if (episode % 10 == 0) and episode < 100:
-                #     loc = self.expert_paths[path_num][path_indexer]
-                #     action = self.expert_paths[path_num][path_indexer + 1] - loc
-                #     action = np.where(possible_actions == action)[0][0]
-                #     path_indexer += 1
-                # else:
+                if (episode % 10 == 0) and episode < 100:
+                    loc = self.expert_paths[path_num][path_indexer]
+                    action = self.expert_paths[path_num][path_indexer + 1] - loc
+                    action = np.where(possible_actions == action)[0][0]
+                    path_indexer += 1
+                else:
                     # choose an action based on the starting location
-                action = self.select_action(loc, features=feature)
+                    action = self.select_action(loc, features=feature)
 
                 terminated, finished, next_state, reward, state, action, loc = (
                     self.find_next_state(loc=loc, action=action, features=feature)

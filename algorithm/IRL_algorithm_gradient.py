@@ -152,7 +152,7 @@ for epoch in range(epochs):
         log.info("Beginning Q-learning module")
         q_learning.reward = rewards
         output, loss = q_learning.run_q_learning(features=x)
-        if loss > 10:
+        if loss > 100:
             continue
 
         log.info("Q-learning completed")
