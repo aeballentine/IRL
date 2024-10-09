@@ -155,7 +155,7 @@ class DeepQ:
         # reward = -(next_state[0].unsqueeze(0) + 2 * next_state[1].unsqueeze(0))   # next_state[0].unsqueeze(0).to(self.device) # + next_state[1].to(self.device)    # todo: made this positive
         # - 2 * next_state[1])  # reward associated with the next state
         reward = (
-                -5.2854 * next_state[0] - 6.1193 * next_state[1] + 2.8502 * next_state[2] - 4.1456 * next_state[3]
+                1.5671 * next_state[0] - 1.1445 * next_state[1] -0.5255 * next_state[2] + 2.9470 * next_state[3]
         ).unsqueeze(0)
 
         # formatting
@@ -252,7 +252,7 @@ class DeepQ:
                 # pick a random place to start
                 # feature = features[0]
 
-                if (episode % 10 == 0) and episode < 100:
+                if (episode % 15 == 0) and episode < 100:
                     loc = self.expert_paths[path_num][path_indexer]
                     action = self.expert_paths[path_num][path_indexer + 1] - loc
                     action = np.where(possible_actions == action)[0][0]
@@ -322,7 +322,7 @@ class DeepQ:
         # plot the loss over time
         plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_Bayesian_tuned_20-5.pth')
+        torch.save(self.policy_net, 'q_learning/policy_net_more_samples.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):
@@ -457,7 +457,7 @@ if __name__ == "__main__":
 
     # MACHINE LEARNING PARAMETERS
     q_tau = (
-        0.9  # rate at which to update the target_net variable inside the Q-learning module
+        0.8  # rate at which to update the target_net variable inside the Q-learning module
     )
     q_lr = 0.0001  # learning rate
     q_criterion = (
@@ -475,10 +475,10 @@ if __name__ == "__main__":
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # LOAD THE DATA
-    data = pd.read_pickle('expert_demonstrations/single_threat.pkl')
+    data = pd.read_pickle('expert_demonstrations/single_threat_sample_paths.pkl')
     feature_function_ = data.feature_map.to_numpy()
     feature_function_ = np.concatenate(feature_function_)
-    expert_paths_ = data.expert_paths
+    expert_paths_ = data.sample_paths
 
     log.info("Expert feature average calculated")
 
