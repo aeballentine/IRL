@@ -96,6 +96,7 @@ class RewardFunction(nn.Module):
 
     def forward(self, features):
         # return the anticipated reward function
+        self.weights = -1 * torch.sqrt(self.weights ** 2)
         f1 = torch.matmul(features, self.weights)   # using matmul to allow for 2d inputs
         return f1
 
