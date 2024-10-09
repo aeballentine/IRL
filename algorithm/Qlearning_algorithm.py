@@ -244,14 +244,14 @@ class DeepQ:
                 # feature = features[episode % len(features)]
                 feature = features[0]
 
-                if (episode % 10 == 0) and episode < 100:
-                    loc = self.expert_paths[path_num][path_indexer]
-                    action = self.expert_paths[path_num][path_indexer + 1] - loc
-                    action = np.where(possible_actions == action)[0][0]
-                    path_indexer += 1
-                else:
+                # if (episode % 10 == 0) and episode < 100:
+                #     loc = self.expert_paths[path_num][path_indexer]
+                #     action = self.expert_paths[path_num][path_indexer + 1] - loc
+                #     action = np.where(possible_actions == action)[0][0]
+                #     path_indexer += 1
+                # else:
                     # choose an action based on the starting location
-                    action = self.select_action(loc, features=feature)
+                action = self.select_action(loc, features=feature)
 
                 terminated, finished, next_state, reward, state, action, loc = (
                     self.find_next_state(loc=loc, action=action, features=feature)
@@ -305,7 +305,7 @@ class DeepQ:
         log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
         sums = self.find_feature_expectation(feature_function=features)
-        return sums
+        return sums, loss
 
     def find_feature_expectation(self, feature_function):
         n_threats = len(feature_function)   # number of threat fields used for training
@@ -313,9 +313,9 @@ class DeepQ:
         feature_function = feature_function.view(-1, self.n_observations)
 
         # tile the starting coordinates
-        coords = np.tile(self.starting_coords[5:], n_threats)
+        coords = np.tile(self.starting_coords, n_threats)
         # make a "conversion" vector: this allows us to access the 2nd and 3rd (and so on) feature functions
-        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords) - 5)
+        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
         # 626 because we've added a 626th row to the feature function for outside the boundary
 
         # starting features

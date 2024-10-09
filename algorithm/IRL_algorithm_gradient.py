@@ -39,7 +39,7 @@ feature_dims = (
 # reward function
 batch_size = 1  # number of samples to take per batch
 learning_rate = 0.01   # learning rate
-epochs = 1000  # number of epochs for the main training loop
+epochs = 600  # number of epochs for the main training loop
 
 # value function
 q_tau = (
@@ -52,7 +52,7 @@ q_criterion = (
 q_batch_size = 500  # batch size
 q_features = 20  # number of features to take into consideration
 q_epochs = 600  # number of epochs to iterate through for Q-learning
-q_accuracy = 4  # value to terminate Q-learning (if value is better than this)
+q_accuracy = 2  # value to terminate Q-learning (if value is better than this)
 q_memory = 500     # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,14 +151,18 @@ for epoch in range(epochs):
 
         log.info("Beginning Q-learning module")
         q_learning.reward = rewards
-        output = q_learning.run_q_learning(features=x)
+        output, loss = q_learning.run_q_learning(features=x)
+        if loss > 10:
+            continue
+
         log.info("Q-learning completed")
 
         output = rewards(output[0, :, :4])
         y = rewards(y[0, :, :4])
 
         loss = criterion(output, y)
-        log.debug(message='Current loss: \t' + str(loss))
+        log.debug(message='Epoch: \t' + str(epoch) +
+                          '\t Current loss: \t' + str(loss))
         log.debug(message=output[:5])
         log.debug(message=y[:5])
         log.debug(message=rewards.state_dict())
