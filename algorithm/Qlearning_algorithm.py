@@ -90,7 +90,7 @@ class DeepQ:
         ).to(device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
 
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
+        self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
 
         self.criterion = criterion
         self.device = device    # should always be mps
@@ -208,7 +208,7 @@ class DeepQ:
 
         loss.backward()
 
-        # torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
+        torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
         return loss.item()
@@ -222,7 +222,7 @@ class DeepQ:
             self.target_net = DQN(
                 n_observations=self.n_observations, n_actions=self.n_actions
             ).to(self.device)
-            self.optimizer = optim.Adam(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
+            self.optimizer = optim.AdamW(self.policy_net.parameters(), lr=self.LR, amsgrad=True)
 
         self.target_net.load_state_dict(self.policy_net.state_dict())
 

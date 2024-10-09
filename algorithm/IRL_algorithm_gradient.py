@@ -92,13 +92,12 @@ class RewardFunction(nn.Module):
     def __init__(self, feature_dim):
         super(RewardFunction, self).__init__()
         # initialize the weights as ones
-        self.weights = nn.Parameter(torch.tensor([-4, -5, -7, 2]).float())
+        self.weights = nn.Parameter(torch.tensor([-2, -2, -3, 1]).float())
 
     def forward(self, features):
         # return the anticipated reward function
-        self.weights = -1 * torch.sqrt(self.weights ** 2)
-        f1 = torch.matmul(features, self.weights)   # using matmul to allow for 2d inputs
-        return f1
+        f1 = torch.matmul(features, self.weights**2)   # using matmul to allow for 2d inputs
+        return -f1
 
 
 rewards = RewardFunction(feature_dim=feature_dims).to(device)
@@ -158,14 +157,19 @@ for epoch in range(epochs):
 
         log.info("Q-learning completed")
 
+        total_cost_NN = torch.sum(output[0, :, 0]).unsqueeze(0)
+        total_cost_ideal = torch.sum(y[0, :, 0]).unsqueeze(0)
+
         output = rewards(output[0, :, :4])
+        output = torch.concat([output, total_cost_NN])
         y = rewards(y[0, :, :4])
+        y = torch.concat([y, total_cost_ideal])
 
         loss = criterion(output, y)
         log.debug(message='Epoch: \t' + str(epoch) +
                           '\t Current loss: \t' + str(loss))
-        log.debug(message=output[:5])
-        log.debug(message=y[:5])
+        log.debug(message=output[[0, 1, 2, 3, 4, -1]])
+        log.debug(message=y[[0, 1, 2, 3, 4, -1]])
         log.debug(message=rewards.state_dict())
 
         loss.backward()
