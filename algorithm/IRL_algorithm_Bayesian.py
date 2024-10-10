@@ -119,61 +119,61 @@ q_learning = DeepQ(
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # train the model
-# log.info("Beginning training")
-#
-#
-# feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, q_features)
-# feature_averages = torch.from_numpy(feature_averages[0]).float().to(device).view(1, 1250, q_features)
-#
-#
-# def obj(x):
-#     rewards.weight_update(x)
-#     q_learning.reward = rewards
-#     output = q_learning.run_q_learning(features=feature_function)
-#     loss = criterion(output, feature_averages)
-#     log.debug(
-#         color="blue",
-#         message="Current Performance: %6.4f" % (loss.item()),
-#     )
-#     return loss.item()
-#
-#
-# res = gp_minimize(obj,
-#                   [(-10, 10), (-10, 10), (-10, 10), (-10, 10)],
-#                   n_calls=100, n_random_starts=20)
-# print(res.x)
-# print(res.fun)
+log.info("Beginning training")
 
-losses_total = [np.inf]
-for epoch in range(epochs):
-    losses = []
-    for batch_num, input_data in enumerate(dataloader):
-        x, y = (
-            input_data  # x is the threat field and y is the expert average feature expectation
-        )
 
-        y = y.to(device).float()
+feature_function = torch.from_numpy(feature_function[0]).float().view(1, 626, q_features)
+feature_averages = torch.from_numpy(feature_averages[0]).float().to(device).view(1, 1250, q_features)
 
-        log.info("Beginning Q-learning module")
-        q_learning.reward = rewards
-        output = q_learning.run_q_learning(features=x)
-        log.info("Q-learning completed")
 
-        loss = criterion(output, y)
-        log.info(message=output[:5])
-        log.info(message=y[:5])
-        log.debug(message=rewards.state_dict())
+def obj(x):
+    rewards.weight_update(x)
+    q_learning.reward = rewards
+    output = q_learning.run_q_learning(features=feature_function)
+    loss = criterion(output, feature_averages)
+    log.debug(
+        color="blue",
+        message="Current Performance: %6.4f" % (loss.item()),
+    )
+    return loss.item()
 
-        loss.requires_grad = True
-        loss.backward()
-        losses.append(loss.item())
-        losses_total.append(loss.item())
+
+res = gp_minimize(obj,
+                  [(-10, 10), (-10, 10), (-10, 10), (-10, 10)],
+                  n_calls=100, n_random_starts=20)
+print(res.x)
+print(res.fun)
+
+# losses_total = [np.inf]
+# for epoch in range(epochs):
+#     losses = []
+#     for batch_num, input_data in enumerate(dataloader):
+#         x, y = (
+#             input_data  # x is the threat field and y is the expert average feature expectation
+#         )
 #
-#         # can try this, but parameters look to be independent now
-#         # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
+#         y = y.to(device).float()
 #
-        optimizer.step()
-        log.debug(message=rewards.state_dict())
+#         log.info("Beginning Q-learning module")
+#         q_learning.reward = rewards
+#         output = q_learning.run_q_learning(features=x)
+#         log.info("Q-learning completed")
+#
+#         loss = criterion(output, y)
+#         log.info(message=output[:5])
+#         log.info(message=y[:5])
+#         log.debug(message=rewards.state_dict())
+#
+#         loss.requires_grad = True
+#         loss.backward()
+#         losses.append(loss.item())
+#         losses_total.append(loss.item())
+# #
+# #         # can try this, but parameters look to be independent now
+# #         # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
+# #
+#         optimizer.step()
+#         log.debug(message=rewards.state_dict())
 #
 #         # # variable learning rate
 #         # if loss.item() < 50:

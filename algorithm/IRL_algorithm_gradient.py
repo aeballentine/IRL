@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from skopt import gp_minimize
 
 from IRL_architecture import CustomRewardDataset
 from IRL_utilities import neighbors_of_four
