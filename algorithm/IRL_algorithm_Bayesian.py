@@ -155,8 +155,8 @@ print(res.fun)
 #         y = y.to(device).float()
 #
 #         log.info("Beginning Q-learning module")
-#         q_learning.reward = rewards
-#         output = q_learning.run_q_learning(features=x)
+#         evaluation.reward = rewards
+#         output = evaluation.run_q_learning(features=x)
 #         log.info("Q-learning completed")
 #
 #         loss = criterion(output, y)
@@ -200,4 +200,4 @@ print(res.fun)
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # save the model parameters
 # torch.save(rewards, "results/reward_model_updated_two.pth")
-# torch.save(q_learning.policy_net, "results/policy_model_updated_two.pth")
+# torch.save(evaluation.policy_net, "results/policy_model_updated_two.pth")

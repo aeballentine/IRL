@@ -322,7 +322,7 @@ class DeepQ:
         # plot the loss over time
         plt.plot(np.arange(0, len(cumulative_loss), 1), cumulative_loss)
         # self.find_feature_expectation(feature_function=features)
-        torch.save(self.policy_net, 'q_learning/policy_net_more_samples.pth')
+        torch.save(self.policy_net, 'evaluation/policy_net_more_samples.pth')
         self.check_convergence(feature_function=features)
 
     def check_convergence(self, feature_function):

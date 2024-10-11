@@ -13,6 +13,7 @@ from itertools import count
 import torch
 from torch import nn
 from torch import optim
+import wandb
 from torch.nn import functional as func
 
 from IRL_utilities import MyLogger
@@ -135,19 +136,7 @@ class DeepQ:
         else:
             return np.random.randint(4)   # return a random action otherwise
 
-            # option: otherwise move to the cell with the smallest threat
-            # threat_old = -np.inf
-            # action = np.inf
-            # neighbors = self.neighbors.loc[loc][1:5]
-            # for i, neighbor in enumerate(neighbors.to_numpy(dtype=np.uint32)):
-            #     threat = features[neighbor, 0]
-            #     if threat > threat_old:
-            #         action = i
-            #         threat_old = threat
-            # return action
-
     def find_next_state(self, loc, action, features):
-        # todo: made this action + 1, check this
         next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
         with torch.no_grad():
@@ -204,6 +193,7 @@ class DeepQ:
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
         loss = self.criterion(state_action_values, expected_state_action_values)
 
+        wandb.log({'q_loss': loss})
         self.optimizer.zero_grad()
 
         loss.backward()
@@ -278,31 +268,16 @@ class DeepQ:
                     loss = loss
 
                 if loc == 624:
-                    log.debug(color='blue', message='Found finish, total iterations: \t \t \t' + str(t) +
-                                                    '\t final loss: \t' + str(np.round(loss, 2)))
                     break
                 elif loc == 625:
-                    log.debug(color='red', message='Exited the graph, total iterations: \t \t' + str(t) +
-                                                   '\t final loss: \t' + str(np.round(loss, 2)))
                     break
                 elif t > 75:
-                    log.debug(message='Stayed in the graph, ran out of iterations' + '\t final loss: \t' +
-                                      str(np.round(loss, 2)))
                     break
-
-            if episode % 50 == 0:
-                log.debug(
-                    "Epoch: \t"
-                    + str(episode)
-                    + " \t Final Loss Calculated: \t"
-                    + str(np.round(loss, 6))
-                )   # print the loss during training
 
             if loss < self.min_accuracy:    # if we reach the specified minimum accuracy, break the loop
                 break
             loss_memory.append(loss)
 
-        log.debug(color='red', message='Final loss: \t' + str(np.round(loss, 4)))
         self.loss = loss
         sums = self.find_feature_expectation(feature_function=features)
         return sums, loss
@@ -315,21 +290,6 @@ class DeepQ:
         # tile the starting coordinates
         coords = np.tile(self.starting_coords, n_threats)
         # make a "conversion" vector: this allows us to access the 2nd and 3rd (and so on) feature functions
-        coords_conv = np.repeat(626 * np.arange(0, n_threats, 1), len(self.starting_coords))
-        # 626 because we've added a 626th row to the feature function for outside the boundary
-
-        # starting features
-        my_features = (
-            feature_function[coords + coords_conv]
-        )
-        # features used to calculate the desired action
-        new_features = copy.deepcopy(my_features).to(self.device)
-        # my_features = my_features[:, :4].view(-1, 4).to(self.device)
-        my_features = my_features.to(self.device).abs()
-
-        # mask for any finished paths (or terminated paths)
-        mask = np.ones(coords.shape, dtype=bool)
-        finished_mask = np.ones(coords.shape, dtype=bool)
 
         finishes = 0
         failures = 0
@@ -340,31 +300,13 @@ class DeepQ:
             # print(new_features)
             my_features = torch.cat([my_features, new_features.abs()])
             for step in range(self.path_length - 1):    # path length - 1 because the first coordinate counts too
+                with torch.no_grad():
+                    action = (
+                        self.policy_net(new_features).max(1).indices.cpu().numpy()
+                    )  # determine the action according to the policy network
 
-                # with torch.no_grad():
-                # print(self.policy_net(new_features))
-
-                action = (
-                    self.policy_net(new_features).max(1).indices.cpu().numpy()
-                )  # determine the action according to the policy network
-                # print("Features: \t", my_features)
-                # print("Coordinates: \t", coords)
-                # print("Action: \t", action)
-                # print("----------")
-
-                # print(action[0])
                 coord = self.neighbors.iloc[coord, action[0] + 1]
-                # print(coord)
                 new_features = feature_function[[coord]].to(self.device)
-
-                # coords[mask] = list(
-                #     map(
-                #         lambda index: self.neighbors.iloc[
-                #             index[1], action[index[0]] + 1
-                #         ],
-                #         enumerate(coords[mask]),
-                #     )
-                # )   # find the next coordinate according to the initial location and action
 
                 my_features = torch.cat([my_features, new_features.abs()])
                 if coord == 624:
@@ -389,33 +331,7 @@ class DeepQ:
                 else:
                     continue
 
-                # ind = np.where(coords == self.target_loc)
-                # if ind:
-                #     mask[ind] = False
-                #     finished_mask[ind] = False
-                # failures = np.where(coords == self.target_loc + 1)
-                # if failures:
-                #     mask[failures] = False
-                #
-                # new_features = (
-                #     feature_function[coords[finished_mask] + coords_conv[finished_mask]].view(-1, self.n_observations).to(self.device)
-                # )   # find the features at the new location
-                # # now add the features: should be gamma^t * new_features for t in [0, T]
-                # # step starts at 0, we start at 1 because this is the 2nd point in the path
-                # my_features[finished_mask] = torch.cat((my_features, new_features.abs()))   # self.gamma ** (step + 1) * new_features
-
-        # total number of paths, then finishes and failures
-        # total_paths = len(coords)
-        # not_finishes_failures = sum(mask)
-        # not_finishes = sum(finished_mask)
-        # finishes = total_paths - not_finishes
-        # failures = total_paths - not_finishes_failures - finishes   # check this, is the right math?
-        log.debug(color='red', message='Number of failures \t' + str(failures))
-        log.debug(color='red', message='Number of successes \t' + str(finishes))
-
-        # formatting to return the calculated feature function
-        # n_returns = len(self.starting_coords)
-        # reshaped_features = my_features.view(-1, n_returns, my_features.size(1))
-        # feature_sums = reshaped_features.sum(dim=1) / len(self.starting_coords)
+        wandb.log({'q_learning_finishes': finishes})
+        wandb.log({'q_learning_failures': failures})
 
         return my_features.view(-1, len(my_features), self.n_observations)

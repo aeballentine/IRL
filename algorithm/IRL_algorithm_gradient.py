@@ -5,20 +5,20 @@ Inverse reinforcement learning: learn the reward function from expert demonstrat
 
 import pandas as pd
 import numpy as np
+import wandb
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from IRL_architecture import CustomRewardDataset
+from create_expert_demonstrations import get_expert_demos
 from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
-import matplotlib.pyplot as plt
+from evaluation_dijkstra import dijkstra_evaluation
 
 log.info("Initializing code")
 torch.set_printoptions(linewidth=800)
 
-# QUESTION: why does the loss decrease when there are more paths that terminate - let this run more and then look into
-# it again once we have a larger sample set
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # PARAMETERS
 
@@ -38,7 +38,8 @@ feature_dims = (
 # reward function
 batch_size = 1  # number of samples to take per batch
 learning_rate = 0.01   # learning rate
-epochs = 600  # number of epochs for the main training loop
+epochs = 1  # number of epochs for the main training loop
+criterion = nn.HuberLoss()
 
 # value function
 q_tau = (
@@ -50,7 +51,7 @@ q_criterion = (
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 500  # batch size
 q_features = 20  # number of features to take into consideration
-q_epochs = 600  # number of epochs to iterate through for Q-learning
+q_epochs = 1  # number of epochs to iterate through for Q-learning
 q_accuracy = 2  # value to terminate Q-learning (if value is better than this)
 q_memory = 500     # memory length for Q-learning
 
@@ -58,30 +59,9 @@ q_memory = 500     # memory length for Q-learning
 # NEIGHBORS OF FOUR
 neighbors = neighbors_of_four(dims=dims, target=target_loc)
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# LOAD THE DATA
-data = pd.read_pickle('expert_demonstrations/single_threat_sample_paths.pkl')
-
-feature_averages = data.expert_feat
-feature_function = data.feature_map
-threat_fields = data.threat_field
-expert_paths = data.sample_paths
-test_points = data.test_points[0]
-
-log.info("Expert feature average calculated")
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# select the device to use: cpu or mps (mps is faster)
-device = torch.device(
-    "cuda" if torch.cuda.is_available() else
-    "mps" if torch.backends.mps.is_available() else
-    "cpu"
-)
-log.info("The device is: " + str(device))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# constants for the network & initialize the reward model
-
-
+# REWARD FUNCTION CLASS
 class RewardFunction(nn.Module):
     """
     Assuming the reward function is a linear combination of the features
@@ -95,124 +75,123 @@ class RewardFunction(nn.Module):
 
     def forward(self, features):
         # return the anticipated reward function
-        f1 = torch.matmul(features, self.weights**2)   # using matmul to allow for 2d inputs
+        f1 = torch.matmul(features, self.weights ** 2)  # using matmul to allow for 2d inputs
         return -f1
 
 
-rewards = RewardFunction(feature_dim=feature_dims).to(device)
-criterion = nn.HuberLoss()
-optimizer = torch.optim.Adam(rewards.parameters(), lr=learning_rate, amsgrad=True)
-log.info(rewards)
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# create the dataloader and the testloader
-dataset = CustomRewardDataset(feature_map=feature_function, expert_expectation=feature_averages)
-dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)  # todo: changed this to false
-
-log.info("The dataloaders are created")
-
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# set up the deep Q network
-q_learning = DeepQ(
-    n_observations=q_features,
-    n_actions=4,
-    device=device,
-    LR=q_lr,
-    neighbors=neighbors,
-    gamma=gamma,
-    target_loc=target_loc,
-    min_accuracy=q_accuracy,
-    memory_length=q_memory,
-    tau=q_tau,
-    num_epochs=q_epochs,
-    batch_size=q_batch_size,
-    criterion=q_criterion,
-    path_length=path_length,
-    expert_paths=expert_paths,
-    starting_coords=test_points,
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# select the device to use: cpu or mps (mps is faster)
+device = torch.device(
+    "cuda" if torch.cuda.is_available() else
+    "mps" if torch.backends.mps.is_available() else
+    "cpu"
 )
+log.info("The device is: " + str(device))
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# train the model
-log.info("Beginning training")
+# WEIGHTS AND BIASES
+num_sample_points = [10, 50, 100, 200, 300, 400, 500, 600]
+# wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
+wandb.login()
 
-losses_total = [np.inf]
-best_loss = np.inf
-best_reward = None
-for epoch in range(epochs):
-    losses = []
-    for batch_num, input_data in enumerate(dataloader):
-        x, y = (
-            input_data  # x is the threat field and y is the expert average feature expectation
-        )
+for num in num_sample_points:
+    run = wandb.init(project='inverse-reinforcement-learning',
+                     name=str(num) + '-sample-points',
+                     config={
+                         'gamma': 1,
+                         'reward_learning_rate': learning_rate,
+                         'reward_epochs': epochs,
+                         'reward_features': feature_dims,
+                         'q_learning_rate': q_lr,
+                         'q_batch_size': q_batch_size,
+                         'q_memory': q_memory,
+                         'q_epochs': q_epochs,
+                         'q_tau': q_tau,
+                         'q_features': q_features
+                     })
 
-        y = y.to(device).float()
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # LOAD THE DATA
+    data = get_expert_demos(num_paths=num, training_percent=0.1)
 
-        log.info("Beginning Q-learning module")
-        q_learning.reward = rewards
-        output, loss = q_learning.run_q_learning(features=x)
-        if loss > 100:
-            continue
+    feature_averages = data.expert_feat
+    feature_function = data.feature_map
+    threat_fields = data.threat_field
+    expert_paths = data.sample_paths
+    test_points = data.test_points[0]
 
-        log.info("Q-learning completed")
+    log.info("Expert feature average calculated")
 
-        total_cost_NN = torch.sum(output[0, :, 0]).unsqueeze(0)
-        total_cost_ideal = torch.sum(y[0, :, 0]).unsqueeze(0)
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # constants for the network & initialize the reward model
+    rewards = RewardFunction(feature_dim=feature_dims).to(device)
 
-        output = rewards(output[0, :, :4])
-        output = torch.concat([output, total_cost_NN])
-        y = rewards(y[0, :, :4])
-        y = torch.concat([y, total_cost_ideal])
+    optimizer = torch.optim.Adam(rewards.parameters(), lr=learning_rate, amsgrad=True)
+    log.info(rewards)
 
-        loss = criterion(output, y)
-        log.debug(message='Epoch: \t' + str(epoch) +
-                          '\t Current loss: \t' + str(loss))
-        log.debug(message=output[[0, 1, 2, 3, 4, -1]])
-        log.debug(message=y[[0, 1, 2, 3, 4, -1]])
-        log.debug(message=rewards.state_dict())
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # create the dataloader and the testloader
+    dataset = CustomRewardDataset(feature_map=feature_function, expert_expectation=feature_averages)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)  # todo: changed this to false
 
-        loss.backward()
-        losses.append(loss.item())
-        losses_total.append(loss.item())
-#
-#         # can try this, but parameters look to be independent now
-#         # torch.nn.utils.clip_grad_value_(rewards.parameters(), 100)
-#
-        optimizer.step()
-        log.debug(message=rewards.state_dict())
+    log.info("The dataloaders are created")
 
-        if loss.item() < best_loss:
-            torch.save(rewards, "results/reward_best_model_more_samples.pth")
-            torch.save(q_learning.policy_net, "results/policy_model_best_more_samples.pth")
-            best_loss = loss.item()
-            best_reward = rewards.state_dict()
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # set up the deep Q network
+    q_learning = DeepQ(
+        n_observations=q_features,
+        n_actions=4,
+        device=device,
+        LR=q_lr,
+        neighbors=neighbors,
+        gamma=gamma,
+        target_loc=target_loc,
+        min_accuracy=q_accuracy,
+        memory_length=q_memory,
+        tau=q_tau,
+        num_epochs=q_epochs,
+        batch_size=q_batch_size,
+        criterion=q_criterion,
+        path_length=path_length,
+        expert_paths=expert_paths,
+        starting_coords=test_points,
+    )
 
-#
-#         # # variable learning rate
-#         # if loss.item() < 50:
-#         #     new_rate = learning_rate / 100
-#         # elif loss.item() < 10:
-#         #     new_rate = learning_rate / 1000
-#         # else:
-#         #     new_rate = learning_rate
-#         #
-#         # # update the learning rate accordingly
-#         # for g in optimizer.param_groups:
-#         #     g['lr'] = new_rate
-#
-#         log.debug(
-#             color="blue",
-#             message="Epoch %d | Loss %6.4f" % (epoch, sum(losses) / len(losses)),
-#         )
-#
-# log.info(message=rewards.state_dict())
-losses = np.array(losses_total)
-plt.plot(losses)
-plt.show()
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # train the model
+    for epoch in range(epochs):
+        for batch_num, input_data in enumerate(dataloader):
+            x, y = (
+                input_data  # x is the threat field and y is the expert average feature expectation
+            )
 
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# save the model parameters
-torch.save(rewards, "results/reward_model_final_more_samples.pth")
-torch.save(q_learning.policy_net, "results/policy_model_final_more_samples.pth")
-log.debug("Best loss: \t" + str(best_loss))
-log.debug(rewards.state_dict())
+            y = y.to(device).float()
+            q_learning.reward = rewards
+            output, _ = q_learning.run_q_learning(features=x)
+            # if loss > 100:
+            #     continue
+
+            total_cost_NN = torch.sum(output[0, :, 0]).unsqueeze(0)
+            total_cost_ideal = torch.sum(y[0, :, 0]).unsqueeze(0)
+
+            output = rewards(output[0, :, :4])
+            output = torch.concat([output, total_cost_NN])
+            y = rewards(y[0, :, :4])
+            y = torch.concat([y, total_cost_ideal])
+
+            loss = criterion(output, y)
+
+            loss.backward()
+            wandb.log({'reward_loss': loss})
+            wandb.log({'rewards_values_threat': rewards.weights.cpu().detach().numpy()[0],
+                       'rewards_values_distance': rewards.weights.cpu().detach().numpy()[1],
+                       'rewards_values_grad1': rewards.weights.cpu().detach().numpy()[2],
+                       'rewards_values_grad2': rewards.weights.cpu().detach().numpy()[3]})
+
+            optimizer.step()
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # evaluate against Dijkstra's
+    dijkstra_evaluation(policy_net=q_learning.policy_net, device=device,
+                        feature_function_=feature_function[0], neighbors=neighbors)
+    run.finish()

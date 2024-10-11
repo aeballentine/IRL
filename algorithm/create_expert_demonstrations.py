@@ -1,7 +1,7 @@
 import glob
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import minmax_scale
+import random
 from IRL_utilities import neighbors_of_four, to_2d
 
 
@@ -129,7 +129,7 @@ def create_feature_map(my_field, my_neighbors, grad_x, grad_y):
     return np.concatenate((feature_func, outside_cell), axis=0)
 
 
-def find_feature_expectation(coords, feature_function, discount):
+def find_feature_expectation(coords, feature_function, discount, path_length):
     relevant_features = feature_function[coords]
     relevant_features = relevant_features
     discount_factor = np.reshape(
@@ -149,13 +149,14 @@ def find_feature_expectation(coords, feature_function, discount):
     return discount_expectation
 
 
-if __name__ == "__main__":
+def get_expert_demos(num_paths, training_percent, save=False):
     # parameters of the threat field
     dims = (25, 25)  # dimension of the threat field
     # starting_coords = np.random.randint(0, 623, size=25)  # random points for path planning
     # starting_coords = [341, 126, 26, 620, 299, 208, 148, 150, 27, 302, 134, 460, 513, 200, 1, 598, 69, 309,
     #                    111, 504, 393, 588, 83, 27, 250]
-    starting_coords = np.random.randint(0, 624, 100)
+    # starting_coords = np.random.randint(0, 624, num_paths)
+    starting_coords = random.sample(range(0, 624), num_paths)
     end_index = 624  # index of the final location
 
     path_length = 50  # maximum number of points to keep
@@ -167,10 +168,6 @@ if __name__ == "__main__":
     # parameters to load the relevant files
     data_path = "cost_function/"
     file_list = glob.glob(data_path + "*")
-
-    # counters: for failures
-    failures = 0
-    counter = 0
 
     # these are the variables we'll save to a dataframe
     features = []  # average feature expectation
@@ -197,7 +194,8 @@ if __name__ == "__main__":
         feature_map.append(my_feature_map)
         my_features = []
 
-        for loc in starting_coords[10:]:
+        break_point = int(training_percent * num_paths)
+        for loc in starting_coords[break_point:]:
             path, status = find_optimal_path(
                 value_func=value_function,
                 threat_map=threat_field,
@@ -210,9 +208,9 @@ if __name__ == "__main__":
 
             # find the feature expectation of the path
             my_features.append(find_feature_expectation(
-                coords=path, feature_function=my_feature_map, discount=gamma
+                coords=path, feature_function=my_feature_map, discount=gamma, path_length=path_length
             ))
-        for loc in starting_coords[:10]:
+        for loc in starting_coords[:break_point]:
             path, status = find_optimal_path(
                 value_func=value_function,
                 threat_map=threat_field,
@@ -223,26 +221,35 @@ if __name__ == "__main__":
             )  # find the optimal path using the threat field and value function
             training_paths.append(np.array(path))
 
-            # if not status:
-            #     # print("FAILED")
-            #     failures += 1
-
         # my_features /= len(starting_coords)
         my_features = np.concatenate(my_features, axis=0)
         features.append(my_features)
-    # print(failures)  # NOTE: not sure why these are failures: there are very small discrepancies
 
-    # save to a pkl file
     expert_information = {
         "expert_feat": features,
         "feature_map": feature_map,
         "threat_field": threat_map,
         "sample_paths": [training_paths],
-        'test_points': [starting_coords[10:]]
+        'test_points': [starting_coords[break_point:]]
 
 
     }
     expert_information = pd.DataFrame(expert_information)
-    expert_information.to_pickle("expert_demonstrations/single_threat_sample_paths.pkl")
+
+    return expert_information
+
+
+    # # save to a pkl file
+    # expert_information = {
+    #     "expert_feat": features,
+    #     "feature_map": feature_map,
+    #     "threat_field": threat_map,
+    #     "sample_paths": [training_paths],
+    #     'test_points': [starting_coords[10:]]
+    #
+    #
+    # }
+    # expert_information = pd.DataFrame(expert_information)
+    # expert_information.to_pickle("expert_demonstrations/single_threat_sample_paths.pkl")
 
     # print(', '.join(map(lambda x: str(x), starting_coords)))

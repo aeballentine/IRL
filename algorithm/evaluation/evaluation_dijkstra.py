@@ -2,14 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 import pandas as pd
-# from torchviz import make_dot
-import torch.nn.functional as func
-import matplotlib.pyplot as plt
-import matplotlib
-# import seaborn as sns
-
+import wandb
 from dijkstra import dijkstra
-from IRL_utilities import neighbors_of_four
 
 
 def to_2d(loc, dims):
@@ -74,12 +68,7 @@ class DQN(nn.Module):
         return self.layer4(x)
 
 
-def find_nn_path(feature_function, starting_coord):
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else
-        "mps" if torch.backends.mps.is_available() else
-        "cpu"
-    )
+def find_nn_path(feature_function, starting_coord, policy_net, neighbors, device):
     feature_function = feature_function.view(-1, 20)
     new_coord = starting_coord
     new_feat = feature_function[new_coord].to(device)
@@ -118,23 +107,9 @@ def find_nn_path(feature_function, starting_coord):
     return path, success, left, new_coord, feature_function[new_coord][0] + 2 * feature_function[new_coord][1]
 
 
-if __name__ == "__main__":
-    # neural network
-    device = torch.device(
-        "cuda" if torch.cuda.is_available() else
-        "mps" if torch.backends.mps.is_available() else
-        "cpu"
-    )
-    policy_net = torch.load('policy_model_final_more_samples.pth', weights_only=False, map_location=device)
-    neighbors = neighbors_of_four(dims=(25, 25), target=624)
-
-    data = pd.read_pickle('single_threat_Bayesian_2.pkl')
-    feature_function_ = data.feature_map
-    feature_function_ = np.reshape(feature_function_[0], (626, 20))
-
+def dijkstra_evaluation(policy_net, device, feature_function_, neighbors):
     # for Dijkstra's algorithm
     vertices = np.arange(0, 625, 1)
-    threat_field_ = data.threat_field.to_numpy()[0]
 
     # chose starting coordinates
     starting_coords = np.arange(0, 624, 1)
@@ -159,7 +134,7 @@ if __name__ == "__main__":
         # call dijsktras and the nn
         nn_path, info, outside, fail_loc, fail_val = find_nn_path(
             feature_function=torch.from_numpy(feature_function_).float(),
-            starting_coord=int(coord))
+            starting_coord=int(coord), policy_net=policy_net, neighbors=neighbors, device=device)
         dijkstra_info, counter = dijkstra(feature_function=feature_function_, vertices=vertices, source=int(coord),
                                           node_f=624, neighbors=neighbors)
 
@@ -185,17 +160,11 @@ if __name__ == "__main__":
         # determine the cost of the neural network path and of Dijkstra's algorithm
         dijkstra_cost = 0
         for node in dijkstra_path[1:]:
-            # dijkstra_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
             dijkstra_cost += feature_function_[node][0]
-            # if node == 624:
-            #     dijkstra_cost += 10
 
         nn_cost = 0
         for node in nn_path[1:]:
-            # nn_cost += feature_function_[node][0] + 2 * feature_function_[node][1]
             nn_cost += feature_function_[node][0]
-            # if node == 624:
-            #     nn_cost += 10
 
         # add our values to keep track of them
         nn_length.append(len(nn_path))
@@ -204,51 +173,15 @@ if __name__ == "__main__":
         dijkstra_average.append(float(dijkstra_cost))
         nn_average.append(float(nn_cost))
 
-        # compare the NN path and the Dijkstra's path
-        # costs = feature_function_[:-1, 0] + 2 * feature_function_[:-1, 1]
-        # threat_field, _ = create_dataframe(costs, (25, 25))
-        #
-        # nn_2d = to_2d(np.array(nn_path), (25, 25))
-        # dijkstra_2d = to_2d(np.array(dijkstra_path), (25, 25))
-        # sns.heatmap(threat_field, cbar=False, annot=True, fmt='g')
-        # plt.plot(np.array(nn_2d[1]) + 0.5, 24 - np.array(nn_2d[0]) + 0.5)
-        # plt.plot(np.array(dijkstra_2d[1]) + 0.5, 24 - np.array(dijkstra_2d[0]) + 0.5)
-        # plt.show()
-
-    print('Total number of failures: \t', n_failures)
-    print('Final location if the algorithm failed: \t', np.unique(np.array(failed_loc)))
-    print('Value at the final point if the algorithm failed: \t', np.unique(np.array(failed_threat)))
-    print('Number of times the algorithm left the graph: \t', n_departures)
-
-    plt.rcParams["font.family"] = "serif"
-    plt.rcParams["font.serif"] = ["Times New Roman"]
-    plt.rcParams['font.size'] = 18
+    # print('Total number of failures: \t', n_failures)
+    # print('Final location if the algorithm failed: \t', np.unique(np.array(failed_loc)))
+    # print('Value at the final point if the algorithm failed: \t', np.unique(np.array(failed_threat)))
+    # print('Number of times the algorithm left the graph: \t', n_departures)
 
     # mean and standard deviation
     error = -np.array(dijkstra_average) + np.array(nn_average)
     percent_error = error / np.array(dijkstra_average)
     mean = np.round(np.mean(100 * percent_error), 3)
     std = np.round(np.std(100 * percent_error), 3)
-    # plot the difference between the neural network and Dijkstra's algorithm (positive means Dijkstra's won)
-    plt.scatter(np.array(dijkstra_length), percent_error * 100, c='tab:blue', s=10)
-    plt.xlabel('Optimal Path Length', fontdict={'size': 20})
-    plt.ylabel(r'Percent Error - $J_{NN}$ and $J^*$', fontdict={'size': 20})
-    plt.ylim([-0.1, 100])
-    plt.xlim([0, 60])
 
-    plt.annotate(r'$\bar{x}$: ' + str(mean), xy=(2, 95), horizontalalignment='left', verticalalignment='top',
-                 fontsize=15)
-    plt.annotate(r'$\sigma$: ' + str(std), xy=(2, 90), horizontalalignment='left', verticalalignment='top',
-                 fontsize=15)
-    plt.annotate(r'Non-Convergent Paths: ' + str(n_failures), xy=(2, 85), horizontalalignment='left',
-                 verticalalignment='top',
-                 fontsize=15)
-
-    plt.show()
-
-    # plt.scatter(dijkstra_length, np.array(dijkstra_length) - np.array(nn_length))
-    # plt.show()
-
-    # find mean and standard deviation
-    print('mean = ', np.mean(error))
-    print('sd = ', np.std(error))
+    wandb.log({'num_failures': n_failures, 'average_percent_error': mean, 'sd_percent_error': std})
