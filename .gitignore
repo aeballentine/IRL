@@ -1,4 +1,6 @@
 .idea/
+*.yaml
+algorithm/wandb/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
