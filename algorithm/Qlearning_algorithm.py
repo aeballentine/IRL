@@ -13,7 +13,7 @@ from itertools import count
 import torch
 from torch import nn
 from torch import optim
-import wandb
+# import wandb
 from torch.nn import functional as func
 
 from IRL_utilities import MyLogger
@@ -193,7 +193,7 @@ class DeepQ:
         expected_state_action_values = (next_state_values.unsqueeze(1) * self.gamma) + reward_batch.unsqueeze(1)
         loss = self.criterion(state_action_values, expected_state_action_values)
 
-        wandb.log({'q_loss': loss})
+        # wandb.log({'q_loss': loss})
         self.optimizer.zero_grad()
 
         loss.backward()
@@ -331,7 +331,7 @@ class DeepQ:
                 else:
                     continue
 
-        wandb.log({'q_learning_finishes': finishes})
-        wandb.log({'q_learning_failures': failures})
+        # wandb.log({'q_learning_finishes': finishes})
+        # wandb.log({'q_learning_failures': failures})
 
         return my_features.view(-1, len(my_features), self.n_observations)
