@@ -145,8 +145,8 @@ def find_feature_expectation(coords, feature_function, discount, path_length):
         zeros = np.repeat(zeros, points_missing, axis=0)
         discount_expectation = np.concatenate((discount_expectation, zeros))
 
-    # return np.sum(discount_expectation, axis=0)
-    return discount_expectation
+    return np.sum(discount_expectation, axis=0)
+    # return discount_expectation
 
 
 def get_expert_demos(num_paths, training_percent, save=False):
@@ -210,6 +210,7 @@ def get_expert_demos(num_paths, training_percent, save=False):
             my_features.append(find_feature_expectation(
                 coords=path, feature_function=my_feature_map, discount=gamma, path_length=path_length
             ))
+
         for loc in starting_coords[:break_point]:
             path, status = find_optimal_path(
                 value_func=value_function,
@@ -222,9 +223,8 @@ def get_expert_demos(num_paths, training_percent, save=False):
             training_paths.append(np.array(path))
 
         # my_features /= len(starting_coords)
-        my_features = np.concatenate(my_features, axis=0)
+        my_features = np.stack(my_features)
         features.append(my_features)
-
     expert_information = {
         "expert_feat": features,
         "feature_map": feature_map,

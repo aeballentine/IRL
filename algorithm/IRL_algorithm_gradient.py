@@ -90,8 +90,8 @@ log.info("The device is: " + str(device))
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # WEIGHTS AND BIASES
 num_sample_points = [10, 50, 100, 200, 300, 400, 500, 600]
-wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
-# wandb.login()
+# wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
+wandb.login()
 
 for num in num_sample_points:
     run = wandb.init(project='inverse-reinforcement-learning',
@@ -120,7 +120,6 @@ for num in num_sample_points:
     test_points = data.test_points[0]
 
     log.info("Expert feature average calculated")
-
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # constants for the network & initialize the reward model
     rewards = RewardFunction(feature_dim=feature_dims).to(device)
