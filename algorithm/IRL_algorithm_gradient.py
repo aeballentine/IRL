@@ -3,9 +3,7 @@ UPDATED
 Inverse reinforcement learning: learn the reward function from expert demonstrations
 """
 
-import pandas as pd
-import numpy as np
-# import wandb
+import wandb
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -15,7 +13,7 @@ from IRL_architecture import CustomRewardDataset
 from create_expert_demonstrations import get_expert_demos
 from IRL_utilities import neighbors_of_four
 from Qlearning_algorithm import DeepQ, log
-# from evaluation_dijkstra import dijkstra_evaluation
+from evaluation_dijkstra import dijkstra_evaluation
 
 log.info("Initializing code")
 torch.set_printoptions(linewidth=800)
@@ -38,23 +36,23 @@ feature_dims = (
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 1  # number of samples to take per batch
-learning_rate = 0.01   # learning rate
-epochs = 1  # number of epochs for the main training loop
+learning_rate = 0.01  # learning rate
+epochs = 400  # number of epochs for the main training loop
 criterion = nn.HuberLoss()
 
 # value function
 q_tau = (
-    0.9  # rate at which to update the target_net variable inside the Q-learning module
+    0.8  # rate at which to update the target_net variable inside the Q-learning module
 )
 q_lr = 0.0001  # learning rate for Q-learning
 q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
-q_batch_size = 500  # batch size
+q_batch_size = 400  # batch size
 q_features = 20  # number of features to take into consideration
-q_epochs = 1  # number of epochs to iterate through for Q-learning
+q_epochs = 400  # number of epochs to iterate through for Q-learning
 q_accuracy = 2  # value to terminate Q-learning (if value is better than this)
-q_memory = 500     # memory length for Q-learning
+q_memory = 750  # memory length for Q-learning
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # NEIGHBORS OF FOUR
@@ -92,24 +90,24 @@ log.info("The device is: " + str(device))
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # WEIGHTS AND BIASES
 num_sample_points = [10, 50, 100, 200, 300, 400, 500, 600]
-# wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
+wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
 # wandb.login()
 
 for num in num_sample_points:
-    # run = wandb.init(project='inverse-reinforcement-learning',
-    #                  name=str(num) + '-sample-points',
-    #                  config={
-    #                      'gamma': 1,
-    #                      'reward_learning_rate': learning_rate,
-    #                      'reward_epochs': epochs,
-    #                      'reward_features': feature_dims,
-    #                      'q_learning_rate': q_lr,
-    #                      'q_batch_size': q_batch_size,
-    #                      'q_memory': q_memory,
-    #                      'q_epochs': q_epochs,
-    #                      'q_tau': q_tau,
-    #                      'q_features': q_features
-    #                  })
+    run = wandb.init(project='inverse-reinforcement-learning',
+                     name=str(num) + '-sample-points',
+                     config={
+                         'gamma': 1,
+                         'reward_learning_rate': learning_rate,
+                         'reward_epochs': epochs,
+                         'reward_features': feature_dims,
+                         'q_learning_rate': q_lr,
+                         'q_batch_size': q_batch_size,
+                         'q_memory': q_memory,
+                         'q_epochs': q_epochs,
+                         'q_tau': q_tau,
+                         'q_features': q_features
+                     })
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # LOAD THE DATA
@@ -168,7 +166,7 @@ for num in num_sample_points:
 
             y = y.to(device).float()
             q_learning.reward = rewards
-            output, _ = q_learning.run_q_learning(features=x)
+            output, q_learning_loss, q_learning_failures, q_learning_finishes = q_learning.run_q_learning(features=x)
             # if loss > 100:
             #     continue
 
@@ -183,18 +181,17 @@ for num in num_sample_points:
             loss = criterion(output, y)
 
             loss.backward()
-            # wandb.log({'reward_loss': loss})
-            # wandb.log({'rewards_values_threat': rewards.weights.cpu().detach().numpy()[0],
-            #            'rewards_values_distance': rewards.weights.cpu().detach().numpy()[1],
-            #            'rewards_values_grad1': rewards.weights.cpu().detach().numpy()[2],
-            #            'rewards_values_grad2': rewards.weights.cpu().detach().numpy()[3]})
+            wandb.log({'reward_loss': loss, 'final_q_learning_loss': q_learning_loss,
+                       'q_learning_failures': q_learning_failures, 'q_learning_finishes': q_learning_finishes,
+                       'rewards_values_threat': rewards.weights.cpu().detach().numpy()[0],
+                       'rewards_values_distance': rewards.weights.cpu().detach().numpy()[1],
+                       'rewards_values_grad1': rewards.weights.cpu().detach().numpy()[2],
+                       'rewards_values_grad2': rewards.weights.cpu().detach().numpy()[3]})
 
             optimizer.step()
 
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     # evaluate against Dijkstra's
-    # dijkstra_evaluation(policy_net=q_learning.policy_net, device=device,
-    #                     feature_function_=feature_function[0], neighbors=neighbors)
-    # run.finish()
-    print(datetime.datetime.now())
-    raise Exception()
+    dijkstra_evaluation(policy_net=q_learning.policy_net, device=device,
+                        feature_function_=feature_function[0], neighbors=neighbors)
+    run.finish()
