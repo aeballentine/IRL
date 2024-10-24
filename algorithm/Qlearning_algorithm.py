@@ -140,7 +140,7 @@ class DeepQ:
         next_loc = self.neighbors.iloc[loc, action + 1]    # given a known action, find the corresponding location
         next_state = features[next_loc].to(self.device)
         with torch.no_grad():
-            reward = self.reward(next_state[:4]).unsqueeze(0)
+            reward = self.reward(next_state).unsqueeze(0)
 
         # formatting
         state = features[loc].to(self.device).unsqueeze(0)

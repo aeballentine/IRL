@@ -30,14 +30,14 @@ dims = (25, 25)
 
 # feature dimensions
 feature_dims = (
-    4  # number of features to take into account (for the reward function)
+    10  # number of features to take into account (for the reward function)
 )
 
 # MACHINE LEARNING PARAMETERS
 # reward function
 batch_size = 1  # number of samples to take per batch
-learning_rate = 0.01  # learning rate
-epochs = 400  # number of epochs for the main training loop
+learning_rate = 0.1  # learning rate
+epochs = 500  # number of epochs for the main training loop
 criterion = nn.HuberLoss()
 
 # value function
@@ -49,7 +49,7 @@ q_criterion = (
     nn.HuberLoss()
 )  # criterion to determine the loss during training (otherwise try hinge embedding)
 q_batch_size = 400  # batch size
-q_features = 20  # number of features to take into consideration
+q_features = 10  # number of features to take into consideration
 q_epochs = 400  # number of epochs to iterate through for Q-learning
 q_accuracy = 2  # value to terminate Q-learning (if value is better than this)
 q_memory = 750  # memory length for Q-learning
@@ -70,11 +70,12 @@ class RewardFunction(nn.Module):
     def __init__(self, feature_dim):
         super(RewardFunction, self).__init__()
         # initialize the weights as ones
-        self.weights = nn.Parameter(torch.tensor([-2, -2, -3, 1]).float())
+        self.weights = nn.Parameter(torch.ones(feature_dim).float())
 
     def forward(self, features):
         # return the anticipated reward function
-        f1 = torch.matmul(features, self.weights ** 2)  # using matmul to allow for 2d inputs
+        f1 = torch.matmul(features, self.weights ** 2 / (torch.sum(
+            self.weights ** 4)) ** 0.5)  # using matmul to allow for 2d inputs
         return -f1
 
 
@@ -90,12 +91,12 @@ log.info("The device is: " + str(device))
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # WEIGHTS AND BIASES
 num_sample_points = [10, 50, 100, 200, 300, 400, 500, 600]
-# wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
-wandb.login()
+wandb.login(key='77fd51534f63a49b4afb5879ce07f92f39d9e590')
+# wandb.login()
 
 for num in num_sample_points:
     run = wandb.init(project='inverse-reinforcement-learning',
-                     name=str(num) + '-sample-points',
+                     name=str(num) + '-threat-distance-only',
                      config={
                          'gamma': 1,
                          'reward_learning_rate': learning_rate,
@@ -172,9 +173,9 @@ for num in num_sample_points:
             total_cost_NN = torch.sum(output[0, :, 0]).unsqueeze(0)
             total_cost_ideal = torch.sum(y[0, :, 0]).unsqueeze(0)
 
-            output = rewards(output[0, :, :4])
+            output = rewards(output[0, :, :])
             output = torch.concat([output, total_cost_NN])
-            y = rewards(y[0, :, :4])
+            y = rewards(y[0, :, :])
             y = torch.concat([y, total_cost_ideal])
 
             loss = criterion(output, y)
@@ -183,9 +184,9 @@ for num in num_sample_points:
             wandb.log({'reward_loss': loss, 'final_q_learning_loss': q_learning_loss,
                        'q_learning_failures': q_learning_failures, 'q_learning_finishes': q_learning_finishes,
                        'rewards_values_threat': rewards.weights.cpu().detach().numpy()[0],
-                       'rewards_values_distance': rewards.weights.cpu().detach().numpy()[1],
-                       'rewards_values_grad1': rewards.weights.cpu().detach().numpy()[2],
-                       'rewards_values_grad2': rewards.weights.cpu().detach().numpy()[3]})
+                       'rewards_values_distance': rewards.weights.cpu().detach().numpy()[1], })
+            # 'rewards_values_grad1': rewards.weights.cpu().detach().numpy()[2],
+            # 'rewards_values_grad2': rewards.weights.cpu().detach().numpy()[3]})
 
             optimizer.step()
 
